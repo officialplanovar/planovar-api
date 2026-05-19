@@ -1,0 +1,619 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  CLIENT
+  VENDOR
+  ADMIN
+}
+
+enum PricingType {
+  FIXED
+  QUOTE
+  STARTING_FROM
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum QuoteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+  PAYOUT
+  SUBSCRIPTION
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum SubscriptionTier {
+  BASIC
+  FEATURED
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum NotificationType {
+  BOOKING_REQUEST
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  QUOTE_RECEIVED
+  QUOTE_ACCEPTED
+  QUOTE_REJECTED
+  PAYMENT_RECEIVED
+  PAYOUT_PROCESSED
+  MESSAGE_RECEIVED
+  REVIEW_RECEIVED
+  SUBSCRIPTION_RENEWED
+  SUBSCRIPTION_EXPIRED
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+  SYSTEM
+}
+
+// ─────────────────────────────────────────────
+// GROUP 1 — IDENTITY & AUTH  (Better Auth owns these 4 tables)
+// ─────────────────────────────────────────────
+//
+// Better Auth generates its own IDs (nanoid). We must NOT constrain these
+// columns to uuid type — that's only for tables whose IDs we generate ourselves.
+// All FK columns referencing user.id are also plain String (text) for the same reason.
+
+model User {
+  id            String   @id          // Better Auth-generated ID — not a UUID
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Planovar domain fields — synced via Better Auth additionalFields config
+  role      UserRole @default(CLIENT)
+  phone     String?  @unique
+  firstName String?  @map("first_name")
+  lastName  String?  @map("last_name")
+  isActive  Boolean  @default(true) @map("is_active")
+
+  sessions  Session[]
+  accounts  Account[]
+
+  // Application relations
+  vendorProfile         VendorProfile?
+  bookingsAsClient      Booking[]      @relation("ClientBookings")
+  sentMessages          Message[]
+  notifications         Notification[]
+  reviews               Review[]       @relation("ReviewerReviews")
+  disputes              Dispute[]      @relation("DisputeRaisedBy")
+  auditLogs             AuditLog[]
+  conversationsAsClient Conversation[] @relation("ClientConversations")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id          // Better Auth-generated
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String   // FK → user.id (text, not uuid)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id  // Better Auth-generated
+  accountId             String
+  providerId            String
+  userId                String        // FK → user.id (text, not uuid)
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id  // Better Auth-generated
+  identifier String
+  value      String    @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────
+// GROUP 2 — VENDOR PROFILES
+// ─────────────────────────────────────────────
+
+model VendorProfile {
+  id                    String           @id @default(uuid()) @db.Uuid
+  userId                String           @unique @map("user_id") // FK → user.id (text)
+  businessName          String           @map("business_name")
+  slug                  String           @unique
+  description           String?
+  coverUrl              String?          @map("cover_url")
+  location              Json
+  tags                  String[]
+  ratingAvg             Decimal          @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  reviewCount           Int              @default(0) @map("review_count")
+  subscriptionTier      SubscriptionTier @default(BASIC) @map("subscription_tier")
+  isVerified            Boolean          @default(false) @map("is_verified")
+  bankCode              String?          @map("bank_code")
+  bankAccount           String?          @map("bank_account")
+  paystackRecipientCode String?          @map("paystack_recipient_code")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listings              Listing[]
+  bookings              Booking[]        @relation("VendorBookings")
+  quotes                Quote[]
+  payouts               Payout[]
+  subscriptions         VendorSubscription[]
+  reviews               Review[]         @relation("VendorReviews")
+  reviewResponses       ReviewResponse[]
+  conversationsAsVendor Conversation[]   @relation("VendorConversations")
+
+  @@index([subscriptionTier])
+  @@index([ratingAvg])
+  @@map("vendor_profiles")
+}
+
+// ─────────────────────────────────────────────
+// GROUP 3 — LISTINGS & DISCOVERY
+// ─────────────────────────────────────────────
+
+model Category {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  slug      String     @unique
+  iconUrl   String?    @map("icon_url")
+  parentId  String?    @map("parent_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  listings  Listing[]
+
+  @@map("categories")
+}
+
+model Listing {
+  id          String      @id @default(uuid()) @db.Uuid
+  vendorId    String      @map("vendor_id") @db.Uuid
+  categoryId  String      @map("category_id") @db.Uuid
+  title       String
+  description String
+  pricingType PricingType @map("pricing_type")
+  basePrice   Decimal?    @map("base_price") @db.Decimal(12, 2)
+  priceUnit   String?     @map("price_unit")
+  location    Json
+  tags        String[]
+  isActive    Boolean     @default(true) @map("is_active")
+  isFeatured  Boolean     @default(false) @map("is_featured")
+  viewCount   Int         @default(0) @map("view_count")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  vendor      VendorProfile  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category    Category       @relation(fields: [categoryId], references: [id])
+  media       ListingMedia[]
+  packages    ListingPackage[]
+  bookings    Booking[]
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([isActive, isFeatured])
+  @@map("listings")
+}
+
+model ListingMedia {
+  id        String    @id @default(uuid()) @db.Uuid
+  listingId String    @map("listing_id") @db.Uuid
+  url       String
+  type      MediaType
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  listing   Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("listing_media")
+}
+
+model ListingPackage {
+  id          String   @id @default(uuid()) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(12, 2)
+  features    Json
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("listing_packages")
+}
+
+// ─────────────────────────────────────────────
+// GROUP 4 — BOOKINGS
+// ─────────────────────────────────────────────
+
+model Booking {
+  id            String        @id @default(uuid()) @db.Uuid
+  clientId      String        @map("client_id")      // FK → user.id (text)
+  vendorId      String        @map("vendor_id") @db.Uuid
+  listingId     String        @map("listing_id") @db.Uuid
+  status        BookingStatus @default(PENDING)
+  eventDate     DateTime      @map("event_date")
+  eventLocation Json          @map("event_location")
+  requirements  String?
+  quoteAmount   Decimal?      @map("quote_amount") @db.Decimal(12, 2)
+  finalAmount   Decimal?      @map("final_amount") @db.Decimal(12, 2)
+  platformFee   Decimal?      @map("platform_fee") @db.Decimal(12, 2)
+  vendorPayout  Decimal?      @map("vendor_payout") @db.Decimal(12, 2)
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  client        User          @relation("ClientBookings", fields: [clientId], references: [id])
+  vendor        VendorProfile @relation("VendorBookings", fields: [vendorId], references: [id])
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  statusHistory BookingStatusHistory[]
+  quotes        Quote[]
+  transactions  Transaction[]
+  conversation  Conversation?
+  review        Review?
+  dispute       Dispute?
+
+  @@index([clientId])
+  @@index([vendorId])
+  @@index([status])
+  @@index([eventDate])
+  @@map("bookings")
+}
+
+model BookingStatusHistory {
+  id         String         @id @default(uuid()) @db.Uuid
+  bookingId  String         @map("booking_id") @db.Uuid
+  fromStatus BookingStatus? @map("from_status")
+  toStatus   BookingStatus  @map("to_status")
+  changedBy  String         @map("changed_by") // FK → user.id (text)
+  reason     String?
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  booking    Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_status_history")
+}
+
+model Quote {
+  id          String        @id @default(uuid()) @db.Uuid
+  bookingId   String        @map("booking_id") @db.Uuid
+  vendorId    String        @map("vendor_id") @db.Uuid
+  amount      Decimal       @db.Decimal(12, 2)
+  description String?
+  validUntil  DateTime      @map("valid_until")
+  status      QuoteStatus   @default(PENDING)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  booking     Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  vendor      VendorProfile @relation(fields: [vendorId], references: [id])
+
+  @@index([bookingId])
+  @@map("quotes")
+}
+
+// ─────────────────────────────────────────────
+// GROUP 5 — PAYMENTS & FINANCE
+// ─────────────────────────────────────────────
+
+model Transaction {
+  id                String          @id @default(uuid()) @db.Uuid
+  bookingId         String?         @map("booking_id") @db.Uuid
+  userId            String          @map("user_id")   // FK → user.id (text)
+  type              TransactionType
+  amount            Decimal         @db.Decimal(12, 2)
+  currency          String          @default("NGN")
+  paystackReference String?         @unique @map("paystack_reference")
+  paystackStatus    String?         @map("paystack_status")
+  metadata          Json?
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  booking           Booking?        @relation(fields: [bookingId], references: [id])
+  payoutLineItems   PayoutLineItem[]
+
+  @@index([bookingId])
+  @@index([userId])
+  @@index([paystackReference])
+  @@map("transactions")
+}
+
+model Payout {
+  id                   String        @id @default(uuid()) @db.Uuid
+  vendorId             String        @map("vendor_id") @db.Uuid
+  amount               Decimal       @db.Decimal(12, 2)
+  status               PayoutStatus  @default(PENDING)
+  scheduledAt          DateTime      @map("scheduled_at")
+  processedAt          DateTime?     @map("processed_at")
+  paystackTransferCode String?       @map("paystack_transfer_code")
+  failureReason        String?       @map("failure_reason")
+  createdAt            DateTime      @default(now()) @map("created_at")
+
+  vendor               VendorProfile @relation(fields: [vendorId], references: [id])
+  lineItems            PayoutLineItem[]
+
+  @@index([vendorId])
+  @@index([status])
+  @@map("payouts")
+}
+
+model PayoutLineItem {
+  id             String      @id @default(uuid()) @db.Uuid
+  payoutId       String      @map("payout_id") @db.Uuid
+  transactionId  String      @map("transaction_id") @db.Uuid
+  amount         Decimal     @db.Decimal(12, 2)
+  commissionRate Decimal     @map("commission_rate") @db.Decimal(5, 4)
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  payout         Payout      @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  transaction    Transaction @relation(fields: [transactionId], references: [id])
+
+  @@index([payoutId])
+  @@map("payout_line_items")
+}
+
+model SubscriptionPlan {
+  id             String           @id @default(uuid()) @db.Uuid
+  tier           SubscriptionTier @unique
+  name           String
+  priceMonthly   Decimal          @map("price_monthly") @db.Decimal(12, 2)
+  commissionRate Decimal          @map("commission_rate") @db.Decimal(5, 4)
+  features       Json
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  vendorSubscriptions VendorSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model VendorSubscription {
+  id                       String             @id @default(uuid()) @db.Uuid
+  vendorId                 String             @map("vendor_id") @db.Uuid
+  planId                   String             @map("plan_id") @db.Uuid
+  status                   SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart       DateTime           @map("current_period_start")
+  currentPeriodEnd         DateTime           @map("current_period_end")
+  paystackSubscriptionCode String?            @map("paystack_subscription_code")
+  cancelledAt              DateTime?          @map("cancelled_at")
+  createdAt                DateTime           @default(now()) @map("created_at")
+  updatedAt                DateTime           @updatedAt @map("updated_at")
+
+  vendor                   VendorProfile      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  plan                     SubscriptionPlan   @relation(fields: [planId], references: [id])
+
+  @@index([vendorId])
+  @@index([status])
+  @@map("vendor_subscriptions")
+}
+
+// ─────────────────────────────────────────────
+// GROUP 6 — MESSAGING & COMMUNICATION
+// ─────────────────────────────────────────────
+
+model Conversation {
+  id            String        @id @default(uuid()) @db.Uuid
+  bookingId     String?       @unique @map("booking_id") @db.Uuid
+  clientId      String        @map("client_id")      // FK → user.id (text)
+  vendorId      String        @map("vendor_id") @db.Uuid
+  lastMessageAt DateTime?     @map("last_message_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  booking       Booking?      @relation(fields: [bookingId], references: [id])
+  client        User          @relation("ClientConversations", fields: [clientId], references: [id])
+  vendor        VendorProfile @relation("VendorConversations", fields: [vendorId], references: [id])
+  messages      Message[]
+
+  @@index([clientId])
+  @@index([vendorId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String             @id @default(uuid()) @db.Uuid
+  conversationId String             @map("conversation_id") @db.Uuid
+  senderId       String             @map("sender_id")  // FK → user.id (text)
+  content        String?
+  type           MessageType        @default(TEXT)
+  isRead         Boolean            @default(false) @map("is_read")
+  readAt         DateTime?          @map("read_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  conversation   Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User               @relation(fields: [senderId], references: [id])
+  attachments    MessageAttachment[]
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  url       String
+  fileType  String   @map("file_type")
+  fileSize  Int      @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("message_attachments")
+}
+
+// ─────────────────────────────────────────────
+// GROUP 7 — REVIEWS & TRUST
+// ─────────────────────────────────────────────
+
+model Review {
+  id         String        @id @default(uuid()) @db.Uuid
+  bookingId  String        @unique @map("booking_id") @db.Uuid
+  reviewerId String        @map("reviewer_id")  // FK → user.id (text)
+  vendorId   String        @map("vendor_id") @db.Uuid
+  rating     Int
+  title      String?
+  body       String
+  isVerified Boolean       @default(true) @map("is_verified")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  booking    Booking        @relation(fields: [bookingId], references: [id])
+  reviewer   User           @relation("ReviewerReviews", fields: [reviewerId], references: [id])
+  vendor     VendorProfile  @relation("VendorReviews", fields: [vendorId], references: [id])
+  response   ReviewResponse?
+
+  @@index([vendorId])
+  @@map("reviews")
+}
+
+model ReviewResponse {
+  id        String        @id @default(uuid()) @db.Uuid
+  reviewId  String        @unique @map("review_id") @db.Uuid
+  vendorId  String        @map("vendor_id") @db.Uuid
+  body      String
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  review    Review        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  vendor    VendorProfile @relation(fields: [vendorId], references: [id])
+
+  @@map("review_responses")
+}
+
+// ─────────────────────────────────────────────
+// GROUP 8 — PLATFORM OPERATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id")  // FK → user.id (text)
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean          @default(false) @map("is_read")
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model Dispute {
+  id          String        @id @default(uuid()) @db.Uuid
+  bookingId   String        @unique @map("booking_id") @db.Uuid
+  raisedBy    String        @map("raised_by")   // FK → user.id (text)
+  reason      String
+  description String
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  resolvedBy  String?       @map("resolved_by") // FK → user.id (text)
+  resolvedAt  DateTime?     @map("resolved_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  booking     Booking       @relation(fields: [bookingId], references: [id])
+  raiser      User          @relation("DisputeRaisedBy", fields: [raisedBy], references: [id])
+
+  @@index([status])
+  @@map("disputes")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @map("user_id")  // FK → user.id (text)
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  metadata     Json?
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}

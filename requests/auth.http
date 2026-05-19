@@ -1,0 +1,147 @@
+### Planovar API — Auth requests
+### Use with VS Code REST Client extension or import into Insomnia/Postman.
+### Run the API first: make api-dev
+
+@base = http://localhost:3000
+@clientEmail = testclient@example.com
+@vendorEmail = testvendor@example.com
+@password = TestPass123!
+
+
+# ─────────────────────────────────────────────
+# REGISTRATION
+# ─────────────────────────────────────────────
+
+### Register a CLIENT user (use from client app context)
+POST {{base}}/api/auth/sign-up/email
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "name": "Amara Osei",
+  "email": "{{clientEmail}}",
+  "password": "{{password}}",
+  "role": "CLIENT",
+  "firstName": "Amara",
+  "lastName": "Osei",
+  "phone": "+2348012345678"
+}
+
+###
+
+### Register a VENDOR user (use from vendor app context)
+POST {{base}}/api/auth/sign-up/email
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "name": "Chidi Events Co",
+  "email": "{{vendorEmail}}",
+  "password": "{{password}}",
+  "role": "VENDOR",
+  "firstName": "Chidi",
+  "lastName": "Nwosu",
+  "phone": "+2348087654321"
+}
+
+
+# ─────────────────────────────────────────────
+# EMAIL VERIFICATION (OTP)
+# ─────────────────────────────────────────────
+
+### Step 1 — request OTP (OTP is printed to console in dev mode)
+POST {{base}}/api/auth/email-otp/send-verification-otp
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "email": "{{clientEmail}}",
+  "type": "email-verification"
+}
+
+###
+
+### Step 2 — verify OTP (replace 000000 with the OTP from your console)
+POST {{base}}/api/auth/email-otp/verify-email
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "email": "{{clientEmail}}",
+  "otp": "000000"
+}
+
+
+# ─────────────────────────────────────────────
+# SIGN IN
+# ─────────────────────────────────────────────
+
+### Sign in as client
+# @name clientSignIn
+POST {{base}}/api/auth/sign-in/email
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "email": "{{clientEmail}}",
+  "password": "{{password}}"
+}
+
+###
+
+### Sign in as vendor
+# @name vendorSignIn
+POST {{base}}/api/auth/sign-in/email
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "email": "{{vendorEmail}}",
+  "password": "{{password}}"
+}
+
+
+# ─────────────────────────────────────────────
+# SESSION
+# ─────────────────────────────────────────────
+
+### Get current session (requires session cookie from sign-in above)
+GET {{base}}/api/auth/get-session
+Content-Type: application/json
+Origin: http://localhost:3000
+
+
+# ─────────────────────────────────────────────
+# SIGN OUT
+# ─────────────────────────────────────────────
+
+### Sign out
+POST {{base}}/api/auth/sign-out
+Content-Type: application/json
+Origin: http://localhost:3000
+
+
+# ─────────────────────────────────────────────
+# PASSWORD RESET
+# ─────────────────────────────────────────────
+
+### Step 1 — request reset OTP
+POST {{base}}/api/auth/forget-password
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "email": "{{clientEmail}}"
+}
+
+###
+
+### Step 2 — reset password (replace token with value from email/console)
+POST {{base}}/api/auth/reset-password
+Content-Type: application/json
+Origin: http://localhost:3000
+
+{
+  "newPassword": "NewPass456!",
+  "token": "REPLACE_WITH_TOKEN_FROM_EMAIL"
+}
