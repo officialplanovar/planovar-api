@@ -1,11 +1,41 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { injectBetterAuthPaths } from './auth/better-auth.swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
+
+  // Static branding assets (logos for emails etc.) — served at /branding/*.
+  // Files live in planovar-api/public/branding/ (see the README there).
+  app.useStaticAssets(join(process.cwd(), 'public'), {
+    maxAge: '7d',
+  });
+
+  // ── Request logging (concise; disabled in production) ────────────────────
+  // Logs every request — including Better Auth (/api/auth/*) and webhooks — with
+  // method, path, status and duration. Set LOG_REQUESTS=false to silence.
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.LOG_REQUESTS !== 'false'
+  ) {
+    const httpLogger = new Logger('HTTP');
+    app.use((req: any, res: any, next: () => void) => {
+      const start = Date.now();
+      res.on('finish', () => {
+        const ms = Date.now() - start;
+        httpLogger.log(
+          `${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`,
+        );
+      });
+      next();
+    });
+  }
 
   // Global input validation — strips unknown fields, throws on bad data.
   app.useGlobalPipes(
@@ -13,13 +43,23 @@ async function bootstrap() {
   );
 
   // CORS — Flutter web and admin console origins.
+  // Extra origins can be supplied via CORS_ORIGINS (comma-separated).
+  const defaultOrigins = [
+    'http://localhost:3001', // Flutter client web (dev)
+    'http://localhost:3002', // Flutter vendor web (dev)
+    'http://localhost:3003', // Admin console (dev, default Next port)
+    'http://localhost:3004', // Admin console (dev, documented port)
+  ];
+  const envOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: [
-      'http://localhost:3001', // Flutter client web (dev)
-      'http://localhost:3002', // Flutter vendor web (dev)
-      'http://localhost:3003', // Admin console (dev)
-    ],
+    origin: [...new Set([...defaultOrigins, ...envOrigins])],
     credentials: true, // required for Better Auth session cookies
+    // Expose the Better Auth bearer token so browser SPAs (admin console) can
+    // read it from the response and store it for Authorization headers.
+    exposedHeaders: ['set-auth-token'],
   });
 
   // Swagger — available in dev/staging only.

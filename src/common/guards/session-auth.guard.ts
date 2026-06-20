@@ -4,8 +4,21 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../../auth/auth.config';
+
+/** Convert Node.js IncomingMessage headers to a Web API Headers object. */
+function toWebHeaders(rawHeaders: Record<string, string | string[] | undefined>): Headers {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(rawHeaders)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      value.forEach((v) => headers.append(key, v));
+    } else {
+      headers.set(key, value);
+    }
+  }
+  return headers;
+}
 
 @Injectable()
 export class SessionAuthGuard implements CanActivate {
@@ -13,7 +26,7 @@ export class SessionAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
 
     const session = await auth.api.getSession({
-      headers: fromNodeHeaders(request.headers),
+      headers: toWebHeaders(request.headers as Record<string, string | string[] | undefined>),
     });
 
     if (!session?.user) {
