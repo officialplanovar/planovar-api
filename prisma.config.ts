@@ -3,15 +3,28 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+const databaseUrl = process.env["DATABASE_URL"];
+
+// A shadow DB is only used by `migrate dev`/`migrate diff` (never `migrate
+// deploy`). Use an explicit SHADOW_DATABASE_URL if given; otherwise derive a
+// local-only one by swapping the dev DB name. We only set it when it actually
+// differs from the main URL — otherwise Prisma rejects it as "same as main"
+// (e.g. on Railway, where the DB isn't named `planovar_dev`).
+const shadowDatabaseUrl =
+  process.env["SHADOW_DATABASE_URL"] ??
+  (databaseUrl?.includes("/planovar_dev")
+    ? databaseUrl.replace("/planovar_dev", "/planovar_shadow")
+    : undefined);
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
-    shadowDatabaseUrl:
-      process.env["SHADOW_DATABASE_URL"] ??
-      process.env["DATABASE_URL"]?.replace("/planovar_dev", "/planovar_shadow"),
+    url: databaseUrl,
+    ...(shadowDatabaseUrl && shadowDatabaseUrl !== databaseUrl
+      ? { shadowDatabaseUrl }
+      : {}),
   },
 });
