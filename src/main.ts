@@ -97,11 +97,20 @@ async function bootstrap() {
   }
 
   const port = process.env.PORT ?? 3000;
-  await app.listen(port);
-  console.log(`API running on http://localhost:${port}`);
+  // Bind to '::' (IPv6, dual-stack) — Railway's edge reaches the container over
+  // IPv6, so an IPv4-only bind ('0.0.0.0') gets "connection dial timeout" 502s.
+  // '::' also accepts IPv4-mapped connections, so it works locally too.
+  await app.listen(port, '::');
+  console.log(`API running on :${port} (bound ::, dual-stack)`);
   if (process.env.NODE_ENV !== 'production') {
     console.log(`Swagger docs → http://localhost:${port}/docs`);
   }
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  // Make boot failures loud — otherwise the container exits silently and Railway
+  // just reports a 502 with no clue why.
+  console.error('FATAL: API failed to start');
+  console.error(err);
+  process.exit(1);
+});
