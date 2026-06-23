@@ -6,10 +6,26 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { injectBetterAuthPaths } from './auth/better-auth.swagger';
 
+// Runs the instant node executes this file — if this never appears in the logs,
+// `node dist/main` isn't running at all (start-command/build problem).
+console.log('[boot] dist/main loaded — node is executing');
+
+// Surface anything that would otherwise kill the process silently.
+process.on('uncaughtException', (err) => {
+  console.error('[boot] FATAL uncaughtException:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[boot] FATAL unhandledRejection:', err);
+  process.exit(1);
+});
+
 async function bootstrap() {
+  console.log('[boot] creating Nest app (loading all modules)…');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+  console.log('[boot] Nest app created — configuring middleware…');
 
   // Static branding assets (logos for emails etc.) — served at /branding/*.
   // Files live in planovar-api/public/branding/ (see the README there).
