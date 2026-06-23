@@ -14,6 +14,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {
     this.client = new Redis(config.getOrThrow<string>('REDIS_URL'), {
+      // Railway's internal hostnames (e.g. redis.railway.internal) are IPv6-only.
+      // ioredis defaults to IPv4 DNS lookup (family 4) and can't resolve them,
+      // which would throw in onModuleInit and crash boot. family 0 = both.
+      family: 0,
       maxRetriesPerRequest: 3,
       lazyConnect: true,
       retryStrategy: (times) => {
