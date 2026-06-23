@@ -43,15 +43,33 @@ export class PaystackAdapter implements PaymentProvider {
     };
   }
 
+  /**
+   * Resolve the Paystack Plan code for a tier + cycle from env, e.g.
+   * PAYSTACK_PLAN_PREMIUM_MONTHLY / PAYSTACK_PLAN_GOLD_YEARLY. When present, the
+   * charge becomes a recurring subscription (Paystack auto-creates the
+   * subscription after the first successful charge and renews it on the plan's
+   * interval). When absent, we fall back to a one-time charge so nothing breaks
+   * before the Plans are created.
+   */
+  private planCodeFor(tier: string, cycle: string): string | undefined {
+    const key = `PAYSTACK_PLAN_${tier}_${cycle.toUpperCase()}`;
+    const code = this.config.get<string>(key);
+    return code && code.trim() ? code.trim() : undefined;
+  }
+
   async createSubscription(
     input: CreateSubscriptionInput,
   ): Promise<CreateSubscriptionResult> {
     const debug = process.env.NODE_ENV !== 'production';
     try {
+      // If a Plan code is configured for this tier+cycle, pass `plan` so Paystack
+      // sets up a recurring subscription; otherwise it's a one-time charge.
+      const planCode = this.planCodeFor(input.tier, input.billingCycle);
       const requestBody = {
         email: input.email,
-        amount: input.amount, // already in minor units
+        amount: input.amount, // already in minor units (ignored when `plan` is set)
         currency: input.currency,
+        ...(planCode ? { plan: planCode } : {}),
         // Paystack redirects here after payment; the app's in-app WebView
         // watches for this URL to know checkout finished.
         ...(input.successUrl && { callback_url: input.successUrl }),
@@ -60,7 +78,6 @@ export class PaystackAdapter implements PaymentProvider {
           vendorId: input.vendorId,
           tier: input.tier,
           billingCycle: input.billingCycle,
-          trialDays: input.trialDays ?? 0,
           ...input.metadata,
         },
       };
@@ -72,6 +89,7 @@ export class PaystackAdapter implements PaymentProvider {
             email: requestBody.email,
             callback_url: requestBody.callback_url,
             tier: input.tier,
+            recurring: planCode ? `plan ${planCode}` : 'one-time',
           })}`,
         );
       }
@@ -147,15 +165,25 @@ export class PaystackAdapter implements PaymentProvider {
   }
 
   async cancelSubscription(input: CancelSubscriptionInput): Promise<void> {
-    if (!input.providerSubscriptionId) return;
+    const code = input.providerSubscriptionId;
+    // Only a real Paystack subscription code (SUB_xxx) can be disabled. Before
+    // the subscription.create webhook lands we only hold a transaction
+    // reference — skip the remote call; the caller cancels locally regardless.
+    if (!code || !code.startsWith('SUB_')) return;
     try {
+      // Disabling requires the subscription's email_token; fetch it on demand
+      // (we don't persist it, to avoid a schema change).
+      const res = await fetch(
+        `${this.base}/subscription/${encodeURIComponent(code)}`,
+        { headers: this.headers() },
+      );
+      const data = (await res.json().catch(() => null)) as any;
+      const token = data?.data?.email_token as string | undefined;
+      if (!token) return;
       await fetch(`${this.base}/subscription/disable`, {
         method: 'POST',
         headers: this.headers(),
-        body: JSON.stringify({
-          code: input.providerSubscriptionId,
-          token: input.providerSubscriptionId,
-        }),
+        body: JSON.stringify({ code, token }),
       });
     } catch {
       // Best-effort: the caller cancels locally regardless.

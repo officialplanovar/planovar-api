@@ -10,18 +10,18 @@ export declare class SubscriptionsController {
     getMySubscription(req: Request): Promise<{
         plan: {
             id: string;
-            name: string;
             tier: import("@prisma/client").$Enums.SubscriptionTier;
+            name: string;
             priceMonthly: import("@prisma/client-runtime-utils").Decimal;
             priceYearly: import("@prisma/client-runtime-utils").Decimal;
             currency: string;
             listingLimit: number | null;
             features: import("@prisma/client/runtime/client").JsonValue;
         };
+        status: import("@prisma/client").$Enums.SubscriptionStatus;
         provider: string | null;
         id: string;
         createdAt: Date;
-        status: import("@prisma/client").$Enums.SubscriptionStatus;
         billingCycle: import("@prisma/client").$Enums.BillingCycle;
         currentPeriodStart: Date;
         currentPeriodEnd: Date;
@@ -32,18 +32,18 @@ export declare class SubscriptionsController {
     subscribe(req: Request, dto: SubscribeDto, deviceId?: string): Promise<{
         plan: {
             id: string;
-            name: string;
             tier: import("@prisma/client").$Enums.SubscriptionTier;
+            name: string;
             priceMonthly: import("@prisma/client-runtime-utils").Decimal;
             priceYearly: import("@prisma/client-runtime-utils").Decimal;
             currency: string;
             listingLimit: number | null;
             features: import("@prisma/client/runtime/client").JsonValue;
         };
+        status: import("@prisma/client").$Enums.SubscriptionStatus;
         provider: string | null;
         id: string;
         createdAt: Date;
-        status: import("@prisma/client").$Enums.SubscriptionStatus;
         billingCycle: import("@prisma/client").$Enums.BillingCycle;
         currentPeriodStart: Date;
         currentPeriodEnd: Date;
@@ -64,18 +64,18 @@ export declare class SubscriptionsController {
     changePlan(req: Request, dto: SubscribeDto, deviceId?: string): Promise<{
         plan: {
             id: string;
-            name: string;
             tier: import("@prisma/client").$Enums.SubscriptionTier;
+            name: string;
             priceMonthly: import("@prisma/client-runtime-utils").Decimal;
             priceYearly: import("@prisma/client-runtime-utils").Decimal;
             currency: string;
             listingLimit: number | null;
             features: import("@prisma/client/runtime/client").JsonValue;
         };
+        status: import("@prisma/client").$Enums.SubscriptionStatus;
         provider: string | null;
         id: string;
         createdAt: Date;
-        status: import("@prisma/client").$Enums.SubscriptionStatus;
         billingCycle: import("@prisma/client").$Enums.BillingCycle;
         currentPeriodStart: Date;
         currentPeriodEnd: Date;
@@ -96,18 +96,18 @@ export declare class SubscriptionsController {
     verifyPayment(req: Request, dto: VerifyPaymentDto): Promise<{
         plan: {
             id: string;
-            name: string;
             tier: import("@prisma/client").$Enums.SubscriptionTier;
+            name: string;
             priceMonthly: import("@prisma/client-runtime-utils").Decimal;
             priceYearly: import("@prisma/client-runtime-utils").Decimal;
             currency: string;
             listingLimit: number | null;
             features: import("@prisma/client/runtime/client").JsonValue;
         };
+        status: import("@prisma/client").$Enums.SubscriptionStatus;
         provider: string | null;
         id: string;
         createdAt: Date;
-        status: import("@prisma/client").$Enums.SubscriptionStatus;
         billingCycle: import("@prisma/client").$Enums.BillingCycle;
         currentPeriodStart: Date;
         currentPeriodEnd: Date;

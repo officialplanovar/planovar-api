@@ -6,10 +6,21 @@ const swagger_1 = require("@nestjs/swagger");
 const path_1 = require("path");
 const app_module_1 = require("./app.module");
 const better_auth_swagger_1 = require("./auth/better-auth.swagger");
+console.log('[boot] dist/main loaded — node is executing');
+process.on('uncaughtException', (err) => {
+    console.error('[boot] FATAL uncaughtException:', err);
+    process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+    console.error('[boot] FATAL unhandledRejection:', err);
+    process.exit(1);
+});
 async function bootstrap() {
+    console.log('[boot] creating Nest app (loading all modules)…');
     const app = await core_1.NestFactory.create(app_module_1.AppModule, {
         rawBody: true,
     });
+    console.log('[boot] Nest app created — configuring middleware…');
     app.useStaticAssets((0, path_1.join)(process.cwd(), 'public'), {
         maxAge: '7d',
     });
@@ -71,11 +82,15 @@ async function bootstrap() {
         });
     }
     const port = process.env.PORT ?? 3000;
-    await app.listen(port);
-    console.log(`API running on http://localhost:${port}`);
+    await app.listen(port, '0.0.0.0');
+    console.log(`API running on 0.0.0.0:${port}`);
     if (process.env.NODE_ENV !== 'production') {
         console.log(`Swagger docs → http://localhost:${port}/docs`);
     }
 }
-bootstrap();
+bootstrap().catch((err) => {
+    console.error('FATAL: API failed to start');
+    console.error(err);
+    process.exit(1);
+});
 //# sourceMappingURL=main.js.map

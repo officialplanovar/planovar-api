@@ -223,31 +223,33 @@ let SubscriptionsService = class SubscriptionsService {
         if (!this.billing.verifyTransaction) {
             throw new common_1.BadRequestException('Payment verification is not supported');
         }
+        const verified = await this.billing.verifyTransaction(reference);
         const pending = await this.prisma.vendorSubscription.findFirst({
             where: {
                 vendorId: vendor.id,
-                providerSubscriptionId: reference,
                 status: client_1.SubscriptionStatus.PAST_DUE,
             },
+            orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
                 billingCycle: true,
                 plan: { select: { tier: true } },
             },
         });
-        if (!pending) {
-            throw new common_1.NotFoundException('No pending subscription for this reference');
-        }
-        const verified = await this.billing.verifyTransaction(reference);
         if (verified.status === 'failed') {
-            await this.prisma.vendorSubscription.update({
-                where: { id: pending.id },
-                data: { status: client_1.SubscriptionStatus.EXPIRED },
-            });
+            if (pending) {
+                await this.prisma.vendorSubscription.update({
+                    where: { id: pending.id },
+                    data: { status: client_1.SubscriptionStatus.EXPIRED },
+                });
+            }
             throw new common_1.BadRequestException('Payment was not successful');
         }
         if (verified.status !== 'success') {
             return { status: 'pending' };
+        }
+        if (!pending) {
+            return this.getMySubscription(userId);
         }
         const now = new Date();
         const periodEnd = pending.billingCycle === client_1.BillingCycle.YEARLY
@@ -317,8 +319,14 @@ let SubscriptionsService = class SubscriptionsService {
                 case 'subscription.create':
                     await this.handleSubscriptionCreate(data);
                     break;
+                case 'invoice.update':
+                    await this.handleInvoiceUpdate(data);
+                    break;
                 case 'invoice.payment_failed':
                     await this.handleInvoicePaymentFailed(data);
+                    break;
+                case 'subscription.not_renew':
+                    await this.handleSubscriptionNotRenew(data);
                     break;
                 case 'subscription.disable':
                     await this.handleSubscriptionDisable(data);
@@ -351,11 +359,19 @@ let SubscriptionsService = class SubscriptionsService {
         const existingSub = await this.prisma.vendorSubscription.findFirst({
             where: { vendorId: vendor.id },
             orderBy: { createdAt: 'desc' },
-            select: { id: true, planId: true, plan: { select: { tier: true } } },
+            select: {
+                id: true,
+                planId: true,
+                billingCycle: true,
+                plan: { select: { tier: true } },
+            },
         });
         if (!existingSub)
             return;
         const now = new Date();
+        const periodEnd = existingSub.billingCycle === client_1.BillingCycle.YEARLY
+            ? addMonths(now, 12)
+            : addMonths(now, 1);
         await this.prisma.$transaction([
             this.prisma.vendorSubscription.update({
                 where: { id: existingSub.id },
@@ -364,12 +380,47 @@ let SubscriptionsService = class SubscriptionsService {
                     provider: 'paystack',
                     providerSubscriptionId,
                     currentPeriodStart: now,
-                    currentPeriodEnd: addMonths(now, 1),
+                    currentPeriodEnd: periodEnd,
                 },
             }),
             this.prisma.vendorProfile.update({
                 where: { id: vendor.id },
                 data: { subscriptionTier: existingSub.plan.tier },
+            }),
+        ]);
+    }
+    async handleInvoiceUpdate(data) {
+        const paid = data?.paid === true || data?.status === 'success';
+        const providerSubscriptionId = data?.subscription?.subscription_code;
+        if (!paid || !providerSubscriptionId)
+            return;
+        const sub = await this.prisma.vendorSubscription.findFirst({
+            where: { providerSubscriptionId },
+            select: {
+                id: true,
+                billingCycle: true,
+                vendorId: true,
+                plan: { select: { tier: true } },
+            },
+        });
+        if (!sub)
+            return;
+        const now = new Date();
+        const periodEnd = sub.billingCycle === client_1.BillingCycle.YEARLY
+            ? addMonths(now, 12)
+            : addMonths(now, 1);
+        await this.prisma.$transaction([
+            this.prisma.vendorSubscription.update({
+                where: { id: sub.id },
+                data: {
+                    status: client_1.SubscriptionStatus.ACTIVE,
+                    currentPeriodStart: now,
+                    currentPeriodEnd: periodEnd,
+                },
+            }),
+            this.prisma.vendorProfile.update({
+                where: { id: sub.vendorId },
+                data: { subscriptionTier: sub.plan.tier },
             }),
         ]);
     }
@@ -380,6 +431,15 @@ let SubscriptionsService = class SubscriptionsService {
         await this.prisma.vendorSubscription.updateMany({
             where: { providerSubscriptionId },
             data: { status: client_1.SubscriptionStatus.PAST_DUE },
+        });
+    }
+    async handleSubscriptionNotRenew(data) {
+        const providerSubscriptionId = data?.subscription_code;
+        if (!providerSubscriptionId)
+            return;
+        await this.prisma.vendorSubscription.updateMany({
+            where: { providerSubscriptionId },
+            data: { cancelAtPeriodEnd: true },
         });
     }
     async handleSubscriptionDisable(data) {

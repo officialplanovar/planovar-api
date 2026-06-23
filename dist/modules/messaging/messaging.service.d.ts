@@ -9,8 +9,8 @@ export declare class MessagingService {
         participants: {
             id: string;
             userId: string;
-            unreadCount: number;
             conversationId: string;
+            unreadCount: number;
             lastReadAt: Date | null;
             joinedAt: Date;
         }[];
@@ -19,9 +19,9 @@ export declare class MessagingService {
         id: string;
         createdAt: Date;
         vendorId: string | null;
+        bookingId: string | null;
         clientId: string;
         eventId: string | null;
-        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }>;
@@ -29,8 +29,8 @@ export declare class MessagingService {
         participants: {
             id: string;
             userId: string;
-            unreadCount: number;
             conversationId: string;
+            unreadCount: number;
             lastReadAt: Date | null;
             joinedAt: Date;
         }[];
@@ -39,17 +39,17 @@ export declare class MessagingService {
         id: string;
         createdAt: Date;
         vendorId: string | null;
+        bookingId: string | null;
         clientId: string;
         eventId: string | null;
-        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }>;
     addGroupParticipant(conversationId: string, requesterId: string, userId: string): Promise<{
         id: string;
         userId: string;
-        unreadCount: number;
         conversationId: string;
+        unreadCount: number;
         lastReadAt: Date | null;
         joinedAt: Date;
     } | {
@@ -67,14 +67,14 @@ export declare class MessagingService {
             id: string;
             createdAt: Date;
             metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            content: string | null;
-            isRead: boolean;
-            readAt: Date | null;
-            conversationId: string;
             quoteId: string | null;
+            conversationId: string;
+            senderId: string;
+            content: string | null;
             voiceUrl: string | null;
             voiceDuration: number | null;
-            senderId: string;
+            isRead: boolean;
+            readAt: Date | null;
         };
         messages: ({
             sender: {
@@ -86,26 +86,26 @@ export declare class MessagingService {
             id: string;
             createdAt: Date;
             metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            content: string | null;
-            isRead: boolean;
-            readAt: Date | null;
-            conversationId: string;
             quoteId: string | null;
+            conversationId: string;
+            senderId: string;
+            content: string | null;
             voiceUrl: string | null;
             voiceDuration: number | null;
-            senderId: string;
+            isRead: boolean;
+            readAt: Date | null;
         })[];
         participants: ({
             user: {
-                image: string | null;
                 id: string;
                 name: string;
+                image: string | null;
             };
         } & {
             id: string;
             userId: string;
-            unreadCount: number;
             conversationId: string;
+            unreadCount: number;
             lastReadAt: Date | null;
             joinedAt: Date;
         })[];
@@ -113,54 +113,54 @@ export declare class MessagingService {
         id: string;
         createdAt: Date;
         vendorId: string | null;
+        bookingId: string | null;
         clientId: string;
         eventId: string | null;
-        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }[]>;
     getConversation(conversationId: string, userId: string): Promise<({
         messages: ({
+            sender: {
+                id: string;
+                name: string;
+                image: string | null;
+            };
             attachments: {
+                id: string;
+                createdAt: Date;
                 url: string;
                 publicId: string | null;
                 fileName: string | null;
-                id: string;
-                createdAt: Date;
                 fileType: string;
                 fileSize: number;
                 messageId: string;
             }[];
-            sender: {
-                image: string | null;
-                id: string;
-                name: string;
-            };
         } & {
             type: import("@prisma/client").$Enums.MessageType;
             id: string;
             createdAt: Date;
             metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            content: string | null;
-            isRead: boolean;
-            readAt: Date | null;
-            conversationId: string;
             quoteId: string | null;
+            conversationId: string;
+            senderId: string;
+            content: string | null;
             voiceUrl: string | null;
             voiceDuration: number | null;
-            senderId: string;
+            isRead: boolean;
+            readAt: Date | null;
         })[];
         participants: ({
             user: {
-                image: string | null;
                 id: string;
                 name: string;
+                image: string | null;
             };
         } & {
             id: string;
             userId: string;
-            unreadCount: number;
             conversationId: string;
+            unreadCount: number;
             lastReadAt: Date | null;
             joinedAt: Date;
         })[];
@@ -169,74 +169,74 @@ export declare class MessagingService {
         id: string;
         createdAt: Date;
         vendorId: string | null;
+        bookingId: string | null;
         clientId: string;
         eventId: string | null;
-        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }) | null>;
     sendMessage(conversationId: string, senderId: string, dto: SendMessageDto): Promise<{
+        sender: {
+            id: string;
+            name: string;
+            image: string | null;
+        };
         attachments: {
+            id: string;
+            createdAt: Date;
             url: string;
             publicId: string | null;
             fileName: string | null;
-            id: string;
-            createdAt: Date;
             fileType: string;
             fileSize: number;
             messageId: string;
         }[];
-        sender: {
-            image: string | null;
-            id: string;
-            name: string;
-        };
     } & {
         type: import("@prisma/client").$Enums.MessageType;
         id: string;
         createdAt: Date;
         metadata: import("@prisma/client/runtime/client").JsonValue | null;
-        content: string | null;
-        isRead: boolean;
-        readAt: Date | null;
-        conversationId: string;
         quoteId: string | null;
+        conversationId: string;
+        senderId: string;
+        content: string | null;
         voiceUrl: string | null;
         voiceDuration: number | null;
-        senderId: string;
+        isRead: boolean;
+        readAt: Date | null;
     }>;
     markRead(conversationId: string, userId: string): Promise<{
         updated: number;
     }>;
     getMessages(conversationId: string, userId: string, take?: number, cursor?: string): Promise<({
+        sender: {
+            id: string;
+            name: string;
+            image: string | null;
+        };
         attachments: {
+            id: string;
+            createdAt: Date;
             url: string;
             publicId: string | null;
             fileName: string | null;
-            id: string;
-            createdAt: Date;
             fileType: string;
             fileSize: number;
             messageId: string;
         }[];
-        sender: {
-            image: string | null;
-            id: string;
-            name: string;
-        };
     } & {
         type: import("@prisma/client").$Enums.MessageType;
         id: string;
         createdAt: Date;
         metadata: import("@prisma/client/runtime/client").JsonValue | null;
-        content: string | null;
-        isRead: boolean;
-        readAt: Date | null;
-        conversationId: string;
         quoteId: string | null;
+        conversationId: string;
+        senderId: string;
+        content: string | null;
         voiceUrl: string | null;
         voiceDuration: number | null;
-        senderId: string;
+        isRead: boolean;
+        readAt: Date | null;
     })[]>;
     isParticipant(conversationId: string, userId: string): Promise<boolean>;
     private assertParticipant;

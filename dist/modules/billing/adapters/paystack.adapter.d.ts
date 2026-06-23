@@ -8,6 +8,7 @@ export declare class PaystackAdapter implements PaymentProvider {
     constructor(config: ConfigService);
     private get secret();
     private headers;
+    private planCodeFor;
     createSubscription(input: CreateSubscriptionInput): Promise<CreateSubscriptionResult>;
     verifyTransaction(reference: string): Promise<VerifyTransactionResult>;
     cancelSubscription(input: CancelSubscriptionInput): Promise<void>;

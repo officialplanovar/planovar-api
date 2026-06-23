@@ -33,20 +33,26 @@ let PaystackAdapter = PaystackAdapter_1 = class PaystackAdapter {
             'Content-Type': 'application/json',
         };
     }
+    planCodeFor(tier, cycle) {
+        const key = `PAYSTACK_PLAN_${tier}_${cycle.toUpperCase()}`;
+        const code = this.config.get(key);
+        return code && code.trim() ? code.trim() : undefined;
+    }
     async createSubscription(input) {
         const debug = process.env.NODE_ENV !== 'production';
         try {
+            const planCode = this.planCodeFor(input.tier, input.billingCycle);
             const requestBody = {
                 email: input.email,
                 amount: input.amount,
                 currency: input.currency,
+                ...(planCode ? { plan: planCode } : {}),
                 ...(input.successUrl && { callback_url: input.successUrl }),
                 metadata: {
                     type: 'subscription',
                     vendorId: input.vendorId,
                     tier: input.tier,
                     billingCycle: input.billingCycle,
-                    trialDays: input.trialDays ?? 0,
                     ...input.metadata,
                 },
             };
@@ -57,6 +63,7 @@ let PaystackAdapter = PaystackAdapter_1 = class PaystackAdapter {
                     email: requestBody.email,
                     callback_url: requestBody.callback_url,
                     tier: input.tier,
+                    recurring: planCode ? `plan ${planCode}` : 'one-time',
                 })}`);
             }
             const res = await fetch(`${this.base}/transaction/initialize`, {
@@ -116,16 +123,19 @@ let PaystackAdapter = PaystackAdapter_1 = class PaystackAdapter {
         }
     }
     async cancelSubscription(input) {
-        if (!input.providerSubscriptionId)
+        const code = input.providerSubscriptionId;
+        if (!code || !code.startsWith('SUB_'))
             return;
         try {
+            const res = await fetch(`${this.base}/subscription/${encodeURIComponent(code)}`, { headers: this.headers() });
+            const data = (await res.json().catch(() => null));
+            const token = data?.data?.email_token;
+            if (!token)
+                return;
             await fetch(`${this.base}/subscription/disable`, {
                 method: 'POST',
                 headers: this.headers(),
-                body: JSON.stringify({
-                    code: input.providerSubscriptionId,
-                    token: input.providerSubscriptionId,
-                }),
+                body: JSON.stringify({ code, token }),
             });
         }
         catch {

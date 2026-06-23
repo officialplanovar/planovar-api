@@ -28,6 +28,7 @@ let RedisService = class RedisService {
     constructor(config) {
         this.config = config;
         this.client = new ioredis_1.default(config.getOrThrow('REDIS_URL'), {
+            family: 0,
             maxRetriesPerRequest: 3,
             lazyConnect: true,
             retryStrategy: (times) => {

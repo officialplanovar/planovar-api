@@ -34,16 +34,16 @@ export declare class PaymentsController {
         } & {
             type: import("@prisma/client").$Enums.TransactionType;
             id: string;
+            currency: string;
             createdAt: Date;
             userId: string;
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            currency: string;
-            bookingId: string | null;
             amount: import("@prisma/client-runtime-utils").Decimal;
-            installmentId: string | null;
             paystackReference: string | null;
             flutterwaveReference: string | null;
             paystackStatus: string | null;
+            metadata: import("@prisma/client/runtime/client").JsonValue | null;
+            bookingId: string | null;
+            installmentId: string | null;
         })[];
         meta: {
             total: number;
@@ -54,26 +54,26 @@ export declare class PaymentsController {
     }>;
     getInstallments(req: Request, bookingId: string): Promise<{
         type: import("@prisma/client").$Enums.InstallmentType;
+        status: import("@prisma/client").$Enums.InstallmentStatus;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        sortOrder: number;
-        status: import("@prisma/client").$Enums.InstallmentStatus;
         amount: import("@prisma/client-runtime-utils").Decimal;
         quoteId: string;
         label: string;
         percentage: import("@prisma/client-runtime-utils").Decimal;
         dueAt: Date | null;
         paidAt: Date | null;
+        sortOrder: number;
     }[]>;
     releaseEscrow(req: Request, holdId: string): Promise<{
         escrowHold: {
+            status: import("@prisma/client").$Enums.EscrowStatus;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            status: import("@prisma/client").$Enums.EscrowStatus;
-            bookingId: string;
             amount: import("@prisma/client-runtime-utils").Decimal;
+            bookingId: string;
             installmentId: string | null;
             heldAt: Date;
             releasedAt: Date | null;

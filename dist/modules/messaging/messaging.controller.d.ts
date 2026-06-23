@@ -9,8 +9,8 @@ export declare class MessagingController {
         participants: {
             id: string;
             userId: string;
-            unreadCount: number;
             conversationId: string;
+            unreadCount: number;
             lastReadAt: Date | null;
             joinedAt: Date;
         }[];
@@ -19,9 +19,9 @@ export declare class MessagingController {
         id: string;
         createdAt: Date;
         vendorId: string | null;
+        bookingId: string | null;
         clientId: string;
         eventId: string | null;
-        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }>;
@@ -37,14 +37,14 @@ export declare class MessagingController {
             id: string;
             createdAt: Date;
             metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            content: string | null;
-            isRead: boolean;
-            readAt: Date | null;
-            conversationId: string;
             quoteId: string | null;
+            conversationId: string;
+            senderId: string;
+            content: string | null;
             voiceUrl: string | null;
             voiceDuration: number | null;
-            senderId: string;
+            isRead: boolean;
+            readAt: Date | null;
         };
         messages: ({
             sender: {
@@ -56,26 +56,26 @@ export declare class MessagingController {
             id: string;
             createdAt: Date;
             metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            content: string | null;
-            isRead: boolean;
-            readAt: Date | null;
-            conversationId: string;
             quoteId: string | null;
+            conversationId: string;
+            senderId: string;
+            content: string | null;
             voiceUrl: string | null;
             voiceDuration: number | null;
-            senderId: string;
+            isRead: boolean;
+            readAt: Date | null;
         })[];
         participants: ({
             user: {
-                image: string | null;
                 id: string;
                 name: string;
+                image: string | null;
             };
         } & {
             id: string;
             userId: string;
-            unreadCount: number;
             conversationId: string;
+            unreadCount: number;
             lastReadAt: Date | null;
             joinedAt: Date;
         })[];
@@ -83,54 +83,54 @@ export declare class MessagingController {
         id: string;
         createdAt: Date;
         vendorId: string | null;
+        bookingId: string | null;
         clientId: string;
         eventId: string | null;
-        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }[]>;
     getConversation(req: Request, id: string): Promise<({
         messages: ({
+            sender: {
+                id: string;
+                name: string;
+                image: string | null;
+            };
             attachments: {
+                id: string;
+                createdAt: Date;
                 url: string;
                 publicId: string | null;
                 fileName: string | null;
-                id: string;
-                createdAt: Date;
                 fileType: string;
                 fileSize: number;
                 messageId: string;
             }[];
-            sender: {
-                image: string | null;
-                id: string;
-                name: string;
-            };
         } & {
             type: import("@prisma/client").$Enums.MessageType;
             id: string;
             createdAt: Date;
             metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            content: string | null;
-            isRead: boolean;
-            readAt: Date | null;
-            conversationId: string;
             quoteId: string | null;
+            conversationId: string;
+            senderId: string;
+            content: string | null;
             voiceUrl: string | null;
             voiceDuration: number | null;
-            senderId: string;
+            isRead: boolean;
+            readAt: Date | null;
         })[];
         participants: ({
             user: {
-                image: string | null;
                 id: string;
                 name: string;
+                image: string | null;
             };
         } & {
             id: string;
             userId: string;
-            unreadCount: number;
             conversationId: string;
+            unreadCount: number;
             lastReadAt: Date | null;
             joinedAt: Date;
         })[];
@@ -139,71 +139,71 @@ export declare class MessagingController {
         id: string;
         createdAt: Date;
         vendorId: string | null;
+        bookingId: string | null;
         clientId: string;
         eventId: string | null;
-        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }) | null>;
     getMessages(req: Request, id: string, take?: string, cursor?: string): Promise<({
+        sender: {
+            id: string;
+            name: string;
+            image: string | null;
+        };
         attachments: {
+            id: string;
+            createdAt: Date;
             url: string;
             publicId: string | null;
             fileName: string | null;
-            id: string;
-            createdAt: Date;
             fileType: string;
             fileSize: number;
             messageId: string;
         }[];
-        sender: {
-            image: string | null;
-            id: string;
-            name: string;
-        };
     } & {
         type: import("@prisma/client").$Enums.MessageType;
         id: string;
         createdAt: Date;
         metadata: import("@prisma/client/runtime/client").JsonValue | null;
-        content: string | null;
-        isRead: boolean;
-        readAt: Date | null;
-        conversationId: string;
         quoteId: string | null;
+        conversationId: string;
+        senderId: string;
+        content: string | null;
         voiceUrl: string | null;
         voiceDuration: number | null;
-        senderId: string;
+        isRead: boolean;
+        readAt: Date | null;
     })[]>;
     sendMessage(req: Request, id: string, dto: SendMessageDto): Promise<{
+        sender: {
+            id: string;
+            name: string;
+            image: string | null;
+        };
         attachments: {
+            id: string;
+            createdAt: Date;
             url: string;
             publicId: string | null;
             fileName: string | null;
-            id: string;
-            createdAt: Date;
             fileType: string;
             fileSize: number;
             messageId: string;
         }[];
-        sender: {
-            image: string | null;
-            id: string;
-            name: string;
-        };
     } & {
         type: import("@prisma/client").$Enums.MessageType;
         id: string;
         createdAt: Date;
         metadata: import("@prisma/client/runtime/client").JsonValue | null;
-        content: string | null;
-        isRead: boolean;
-        readAt: Date | null;
-        conversationId: string;
         quoteId: string | null;
+        conversationId: string;
+        senderId: string;
+        content: string | null;
         voiceUrl: string | null;
         voiceDuration: number | null;
-        senderId: string;
+        isRead: boolean;
+        readAt: Date | null;
     }>;
     markRead(req: Request, id: string): Promise<{
         updated: number;
@@ -211,8 +211,8 @@ export declare class MessagingController {
     addParticipant(req: Request, id: string, userId: string): Promise<{
         id: string;
         userId: string;
-        unreadCount: number;
         conversationId: string;
+        unreadCount: number;
         lastReadAt: Date | null;
         joinedAt: Date;
     } | {

@@ -11,27 +11,27 @@ export declare class AdminVendorsController {
     constructor(vendorsService: VendorsService, admin: AdminService, audit: AuditService);
     list(query: VendorQueryDto): Promise<{
         data: {
-            user: {
-                email: string;
-                id: string;
-                name: string;
-                phone: string | null;
-                isActive: boolean;
-            };
-            tags: string[];
             id: string;
             createdAt: Date;
-            location: import("@prisma/client/runtime/client").JsonValue;
-            reviewCount: number;
-            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
             slug: string;
-            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
-            isVerified: boolean;
             businessName: string;
             businessType: import("@prisma/client").$Enums.VendorBusinessType | null;
             vendorType: import("@prisma/client").$Enums.VendorType;
+            location: import("@prisma/client/runtime/client").JsonValue;
+            tags: string[];
+            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
+            reviewCount: number;
+            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
             kycStatus: import("@prisma/client").$Enums.KycStatus;
             kycSubmittedAt: Date | null;
+            isVerified: boolean;
+            user: {
+                id: string;
+                name: string;
+                phone: string | null;
+                email: string;
+                isActive: boolean;
+            };
         }[];
         meta: {
             total: number;
@@ -41,19 +41,19 @@ export declare class AdminVendorsController {
     }>;
     listPendingKyc(): Promise<{
         id: string;
-        location: import("@prisma/client/runtime/client").JsonValue;
         slug: string;
         businessName: string;
         businessType: import("@prisma/client").$Enums.VendorBusinessType | null;
+        location: import("@prisma/client/runtime/client").JsonValue;
         ninDocumentUrl: string | null;
         cacDocumentUrl: string | null;
         kycSubmittedAt: Date | null;
     }[]>;
     reviewKyc(req: Request, id: string, dto: ReviewKycDto): Promise<{
         id: string;
-        isVerified: boolean;
         kycStatus: import("@prisma/client").$Enums.KycStatus;
         kycReviewedAt: Date | null;
         kycRejectionReason: string | null;
+        isVerified: boolean;
     }>;
 }

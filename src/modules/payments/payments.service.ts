@@ -236,6 +236,7 @@ export class PaymentsService {
     // Route subscription lifecycle events to the subscriptions service
     const SUBSCRIPTION_EVENTS = new Set([
       'subscription.create',
+      'invoice.update',
       'invoice.payment_failed',
       'subscription.disable',
       'subscription.not_renew',

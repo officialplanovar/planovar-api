@@ -11,40 +11,40 @@ export declare class ReviewsService {
     create(reviewerId: string, dto: CreateReviewDto): Promise<{
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        body: string;
-        title: string | null;
-        rating: number;
         vendorId: string;
+        updatedAt: Date;
         isVerified: boolean;
         bookingId: string;
+        title: string | null;
         reviewerId: string;
+        rating: number;
+        body: string;
     }>;
     findAllForVendor(vendorId: string, take?: number, skip?: number): Promise<{
         data: ({
             reviewer: {
-                image: string | null;
                 name: string;
+                image: string | null;
             };
             response: {
                 id: string;
                 createdAt: Date;
+                vendorId: string;
                 updatedAt: Date;
                 body: string;
-                vendorId: string;
                 reviewId: string;
             } | null;
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
-            body: string;
-            title: string | null;
-            rating: number;
             vendorId: string;
+            updatedAt: Date;
             isVerified: boolean;
             bookingId: string;
+            title: string | null;
             reviewerId: string;
+            rating: number;
+            body: string;
         })[];
         meta: {
             total: number;
@@ -56,24 +56,24 @@ export declare class ReviewsService {
     }>;
     findMyReviews(userId: string, take?: number, skip?: number): Promise<{
         data: ({
-            booking: {
-                eventDate: Date;
-            };
             vendor: {
                 slug: string;
                 businessName: string;
             };
+            booking: {
+                eventDate: Date;
+            };
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
-            body: string;
-            title: string | null;
-            rating: number;
             vendorId: string;
+            updatedAt: Date;
             isVerified: boolean;
             bookingId: string;
+            title: string | null;
             reviewerId: string;
+            rating: number;
+            body: string;
         })[];
         meta: {
             total: number;
@@ -85,9 +85,9 @@ export declare class ReviewsService {
     respond(reviewId: string, vendorUserId: string, dto: ReviewResponseDto): Promise<{
         id: string;
         createdAt: Date;
+        vendorId: string;
         updatedAt: Date;
         body: string;
-        vendorId: string;
         reviewId: string;
     }>;
     findOne(reviewId: string): Promise<{
@@ -97,28 +97,28 @@ export declare class ReviewsService {
             businessName: string;
         };
         reviewer: {
-            image: string | null;
             id: string;
             name: string;
+            image: string | null;
         };
         response: {
             id: string;
             createdAt: Date;
+            vendorId: string;
             updatedAt: Date;
             body: string;
-            vendorId: string;
             reviewId: string;
         } | null;
     } & {
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        body: string;
-        title: string | null;
-        rating: number;
         vendorId: string;
+        updatedAt: Date;
         isVerified: boolean;
         bookingId: string;
+        title: string | null;
         reviewerId: string;
+        rating: number;
+        body: string;
     }>;
 }

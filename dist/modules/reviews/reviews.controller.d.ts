@@ -8,35 +8,35 @@ export declare class ReviewsController {
     create(req: Request, dto: CreateReviewDto): Promise<{
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        body: string;
-        title: string | null;
-        rating: number;
         vendorId: string;
+        updatedAt: Date;
         isVerified: boolean;
         bookingId: string;
+        title: string | null;
         reviewerId: string;
+        rating: number;
+        body: string;
     }>;
     findMyReviews(req: Request, take?: string, skip?: string): Promise<{
         data: ({
-            booking: {
-                eventDate: Date;
-            };
             vendor: {
                 slug: string;
                 businessName: string;
             };
+            booking: {
+                eventDate: Date;
+            };
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
-            body: string;
-            title: string | null;
-            rating: number;
             vendorId: string;
+            updatedAt: Date;
             isVerified: boolean;
             bookingId: string;
+            title: string | null;
             reviewerId: string;
+            rating: number;
+            body: string;
         })[];
         meta: {
             total: number;
@@ -48,28 +48,28 @@ export declare class ReviewsController {
     findAllForVendor(vendorId: string, take?: string, skip?: string): Promise<{
         data: ({
             reviewer: {
-                image: string | null;
                 name: string;
+                image: string | null;
             };
             response: {
                 id: string;
                 createdAt: Date;
+                vendorId: string;
                 updatedAt: Date;
                 body: string;
-                vendorId: string;
                 reviewId: string;
             } | null;
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
-            body: string;
-            title: string | null;
-            rating: number;
             vendorId: string;
+            updatedAt: Date;
             isVerified: boolean;
             bookingId: string;
+            title: string | null;
             reviewerId: string;
+            rating: number;
+            body: string;
         })[];
         meta: {
             total: number;
@@ -86,36 +86,36 @@ export declare class ReviewsController {
             businessName: string;
         };
         reviewer: {
-            image: string | null;
             id: string;
             name: string;
+            image: string | null;
         };
         response: {
             id: string;
             createdAt: Date;
+            vendorId: string;
             updatedAt: Date;
             body: string;
-            vendorId: string;
             reviewId: string;
         } | null;
     } & {
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        body: string;
-        title: string | null;
-        rating: number;
         vendorId: string;
+        updatedAt: Date;
         isVerified: boolean;
         bookingId: string;
+        title: string | null;
         reviewerId: string;
+        rating: number;
+        body: string;
     }>;
     respond(req: Request, id: string, dto: ReviewResponseDto): Promise<{
         id: string;
         createdAt: Date;
+        vendorId: string;
         updatedAt: Date;
         body: string;
-        vendorId: string;
         reviewId: string;
     }>;
 }

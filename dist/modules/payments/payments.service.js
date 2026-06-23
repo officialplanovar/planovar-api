@@ -227,6 +227,7 @@ let PaymentsService = PaymentsService_1 = class PaymentsService {
         }
         const SUBSCRIPTION_EVENTS = new Set([
             'subscription.create',
+            'invoice.update',
             'invoice.payment_failed',
             'subscription.disable',
             'subscription.not_renew',

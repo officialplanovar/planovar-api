@@ -282,33 +282,40 @@ export class SubscriptionsService {
       throw new BadRequestException('Payment verification is not supported');
     }
 
+    const verified = await this.billing.verifyTransaction(reference);
+
+    // Find the pending sub for this checkout. With recurring billing the
+    // `subscription.create` webhook can land first — activating the sub and
+    // replacing the reference with the Paystack subscription code — so match the
+    // vendor's latest PAST_DUE sub rather than requiring a reference match.
     const pending = await this.prisma.vendorSubscription.findFirst({
       where: {
         vendorId: vendor.id,
-        providerSubscriptionId: reference,
         status: SubscriptionStatus.PAST_DUE,
       },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         billingCycle: true,
         plan: { select: { tier: true } },
       },
     });
-    if (!pending) {
-      throw new NotFoundException('No pending subscription for this reference');
-    }
-
-    const verified = await this.billing.verifyTransaction(reference);
 
     if (verified.status === 'failed') {
-      await this.prisma.vendorSubscription.update({
-        where: { id: pending.id },
-        data: { status: SubscriptionStatus.EXPIRED },
-      });
+      if (pending) {
+        await this.prisma.vendorSubscription.update({
+          where: { id: pending.id },
+          data: { status: SubscriptionStatus.EXPIRED },
+        });
+      }
       throw new BadRequestException('Payment was not successful');
     }
     if (verified.status !== 'success') {
       return { status: 'pending' };
+    }
+    if (!pending) {
+      // The webhook already activated this subscription — idempotent success.
+      return this.getMySubscription(userId);
     }
 
     const now = new Date();
@@ -401,8 +408,15 @@ export class SubscriptionsService {
         case 'subscription.create':
           await this.handleSubscriptionCreate(data);
           break;
+        case 'invoice.update':
+          // Successful recurring charge — roll the period forward.
+          await this.handleInvoiceUpdate(data);
+          break;
         case 'invoice.payment_failed':
           await this.handleInvoicePaymentFailed(data);
+          break;
+        case 'subscription.not_renew':
+          await this.handleSubscriptionNotRenew(data);
           break;
         case 'subscription.disable':
           await this.handleSubscriptionDisable(data);
@@ -435,11 +449,20 @@ export class SubscriptionsService {
     const existingSub = await this.prisma.vendorSubscription.findFirst({
       where: { vendorId: vendor.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, planId: true, plan: { select: { tier: true } } },
+      select: {
+        id: true,
+        planId: true,
+        billingCycle: true,
+        plan: { select: { tier: true } },
+      },
     });
     if (!existingSub) return;
 
     const now = new Date();
+    const periodEnd =
+      existingSub.billingCycle === BillingCycle.YEARLY
+        ? addMonths(now, 12)
+        : addMonths(now, 1);
     await this.prisma.$transaction([
       this.prisma.vendorSubscription.update({
         where: { id: existingSub.id },
@@ -448,7 +471,7 @@ export class SubscriptionsService {
           provider: 'paystack',
           providerSubscriptionId,
           currentPeriodStart: now,
-          currentPeriodEnd: addMonths(now, 1),
+          currentPeriodEnd: periodEnd,
         },
       }),
       this.prisma.vendorProfile.update({
@@ -458,14 +481,66 @@ export class SubscriptionsService {
     ]);
   }
 
+  /** A recurring charge succeeded — keep ACTIVE and roll the period forward. */
+  private async handleInvoiceUpdate(data: any) {
+    const paid = data?.paid === true || data?.status === 'success';
+    const providerSubscriptionId: string | undefined =
+      data?.subscription?.subscription_code;
+    if (!paid || !providerSubscriptionId) return;
+
+    const sub = await this.prisma.vendorSubscription.findFirst({
+      where: { providerSubscriptionId },
+      select: {
+        id: true,
+        billingCycle: true,
+        vendorId: true,
+        plan: { select: { tier: true } },
+      },
+    });
+    if (!sub) return;
+
+    const now = new Date();
+    const periodEnd =
+      sub.billingCycle === BillingCycle.YEARLY
+        ? addMonths(now, 12)
+        : addMonths(now, 1);
+    await this.prisma.$transaction([
+      this.prisma.vendorSubscription.update({
+        where: { id: sub.id },
+        data: {
+          status: SubscriptionStatus.ACTIVE,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        },
+      }),
+      // Re-assert the tier in case a prior failed charge had downgraded it.
+      this.prisma.vendorProfile.update({
+        where: { id: sub.vendorId },
+        data: { subscriptionTier: sub.plan.tier },
+      }),
+    ]);
+  }
+
   private async handleInvoicePaymentFailed(data: any) {
     const providerSubscriptionId: string | undefined =
       data.subscription?.subscription_code;
     if (!providerSubscriptionId) return;
 
+    // Transient: Paystack will retry. Mark PAST_DUE but keep the tier during the
+    // retry grace; a terminal failure arrives as subscription.disable (→ BASIC).
     await this.prisma.vendorSubscription.updateMany({
       where: { providerSubscriptionId },
       data: { status: SubscriptionStatus.PAST_DUE },
+    });
+  }
+
+  /** Paystack won't renew (card removed / cancelled) — flag end-of-period. */
+  private async handleSubscriptionNotRenew(data: any) {
+    const providerSubscriptionId: string | undefined = data?.subscription_code;
+    if (!providerSubscriptionId) return;
+    await this.prisma.vendorSubscription.updateMany({
+      where: { providerSubscriptionId },
+      data: { cancelAtPeriodEnd: true },
     });
   }
 
