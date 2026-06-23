@@ -97,11 +97,10 @@ async function bootstrap() {
   }
 
   const port = process.env.PORT ?? 3000;
-  // Bind to '::' (IPv6, dual-stack) — Railway's edge reaches the container over
-  // IPv6, so an IPv4-only bind ('0.0.0.0') gets "connection dial timeout" 502s.
-  // '::' also accepts IPv4-mapped connections, so it works locally too.
-  await app.listen(port, '::');
-  console.log(`API running on :${port} (bound ::, dual-stack)`);
+  // Bind to 0.0.0.0 (per Railway docs) — the default bind can leave the edge
+  // proxy unable to reach the app, causing "connection dial timeout" 502s.
+  await app.listen(port, '0.0.0.0');
+  console.log(`API running on 0.0.0.0:${port}`);
   if (process.env.NODE_ENV !== 'production') {
     console.log(`Swagger docs → http://localhost:${port}/docs`);
   }
