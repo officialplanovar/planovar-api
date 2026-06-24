@@ -6,26 +6,22 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { injectBetterAuthPaths } from './auth/better-auth.swagger';
 
-// Runs the instant node executes this file — if this never appears in the logs,
-// `node dist/main` isn't running at all (start-command/build problem).
-console.log('[boot] dist/main loaded — node is executing');
-
-// Surface anything that would otherwise kill the process silently.
+// Log stray async errors but DON'T exit — a single unhandled rejection (a Redis
+// blip, a fire-and-forget index/webhook call) must not take the whole API down.
+// Killing the process here causes Railway to restart it, and requests during the
+// restart window fail with no CORS headers → browsers report them as CORS errors.
+// Genuine boot failures are still fatal via bootstrap().catch() below.
 process.on('uncaughtException', (err) => {
-  console.error('[boot] FATAL uncaughtException:', err);
-  process.exit(1);
+  console.error('uncaughtException (logged, not fatal):', err);
 });
 process.on('unhandledRejection', (err) => {
-  console.error('[boot] FATAL unhandledRejection:', err);
-  process.exit(1);
+  console.error('unhandledRejection (logged, not fatal):', err);
 });
 
 async function bootstrap() {
-  console.log('[boot] creating Nest app (loading all modules)…');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
-  console.log('[boot] Nest app created — configuring middleware…');
 
   // Static branding assets (logos for emails etc.) — served at /branding/*.
   // Files live in planovar-api/public/branding/ (see the README there).
