@@ -19,6 +19,7 @@ export const vendorsSchema: CollectionCreateSchema = {
     { name: 'reviewCount', type: 'int32' },
     { name: 'subscriptionTier', type: 'string', facet: true },
     { name: 'isVerified', type: 'bool' },
+    { name: 'coverUrl', type: 'string', optional: true },
     { name: 'createdAt', type: 'int64' },
   ],
 };

@@ -30,11 +30,41 @@ export class TypesenseSyncService implements OnModuleInit {
       try {
         await this.typesense.collections().create(schema);
       } catch (err: any) {
-        // 409 means already exists — that is fine
-        if (err?.httpStatus !== 409) {
+        // 409 = already exists → reconcile the schema (additive migration).
+        if (err?.httpStatus === 409) {
+          await this.reconcileSchema(schema);
+        } else {
           console.error(`[Typesense] Failed to create collection ${schema.name}:`, err);
         }
       }
+    }
+  }
+
+  /**
+   * Add any fields present in the code schema but missing from the live Typesense
+   * collection (e.g. a newly-added `vendorVerified`). Only ADDS fields — it never
+   * drops or retypes existing ones, so it's non-destructive. Existing documents
+   * get the new field as null until they're re-indexed (run POST /search/admin/sync).
+   */
+  private async reconcileSchema(schema: {
+    name: string;
+    fields: readonly any[];
+  }): Promise<void> {
+    try {
+      const live = await this.typesense.collections(schema.name).retrieve();
+      const liveFields = new Set((live.fields ?? []).map((f: any) => f.name));
+      const missing = schema.fields.filter((f) => !liveFields.has(f.name));
+      if (missing.length === 0) return;
+      await this.typesense
+        .collections(schema.name)
+        .update({ fields: missing as any });
+      this.logger.log(
+        `Typesense: added field(s) to ${schema.name}: ${missing
+          .map((f) => f.name)
+          .join(', ')}`,
+      );
+    } catch (err) {
+      console.error(`[Typesense] Failed to reconcile ${schema.name} schema:`, err);
     }
   }
 
@@ -88,6 +118,37 @@ export class TypesenseSyncService implements OnModuleInit {
     }
   }
 
+  /**
+   * Re-index a vendor and all its active listings — call after KYC approval so
+   * `isVerified` / `vendorVerified` flip and the vendor + services become
+   * discoverable to clients. Best-effort: never throws.
+   */
+  async reindexVendorAndListings(vendorId: string): Promise<void> {
+    try {
+      const vendor = await this.prisma.vendorProfile.findUnique({
+        where: { id: vendorId },
+      });
+      if (vendor) await this.indexVendor(vendor);
+
+      const listings = await this.prisma.listing.findMany({
+        where: { vendorId, isActive: true },
+        include: {
+          vendor: true,
+          media: {
+            where: { type: 'IMAGE' },
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
+          },
+        },
+      });
+      for (const l of listings) {
+        await this.indexListing(l);
+      }
+    } catch (err) {
+      console.error('[Typesense] reindexVendorAndListings failed:', err);
+    }
+  }
+
   private transformListing(listing: any): Record<string, any> {
     const vendor = listing.vendor ?? {};
     const locationJson = listing.location as any;
@@ -118,6 +179,8 @@ export class TypesenseSyncService implements OnModuleInit {
       vendorName: vendor.businessName ?? '',
       vendorSlug: vendor.slug ?? '',
       vendorTier: vendor.subscriptionTier ?? 'BASIC',
+      // Clients only see listings from verified vendors (flips on KYC approval).
+      vendorVerified: vendor.isVerified ?? false,
       rating: Number(listing.ratingAvg ?? 0),
       reviewCount: listing.reviewCount ?? 0,
       isActive: listing.isActive,
@@ -192,6 +255,10 @@ export class TypesenseSyncService implements OnModuleInit {
       reviewCount: vendor.reviewCount ?? 0,
       subscriptionTier: vendor.subscriptionTier ?? 'BASIC',
       isVerified: vendor.isVerified ?? false,
+      // Cover image for search cards; fall back to the logo so tiles aren't blank.
+      ...(vendor.coverUrl || vendor.logoUrl
+        ? { coverUrl: vendor.coverUrl ?? vendor.logoUrl }
+        : {}),
       createdAt: new Date(vendor.createdAt).getTime(),
     };
   }

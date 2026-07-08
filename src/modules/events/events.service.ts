@@ -35,7 +35,8 @@ export class EventsService {
         budgetMin: dto.budget != null ? new Prisma.Decimal(dto.budget) : undefined,
         guestCount: dto.guestCount,
         coverUrl: dto.coverUrl,
-        status: EventStatus.DRAFT,
+        // A wizard-completed event is actively being planned, not a draft.
+        status: EventStatus.PLANNING,
       },
     });
   }
@@ -51,8 +52,13 @@ export class EventsService {
         location: true,
         status: true,
         guestCount: true,
+        budgetMin: true,
+        budgetMax: true,
         coverUrl: true,
         createdAt: true,
+        _count: { select: { eventVendors: true } },
+        // Which listings are on each event — lets the client mark "already added".
+        eventListings: { select: { listingId: true } },
       },
     });
   }
@@ -64,7 +70,36 @@ export class EventsService {
         eventVendors: {
           include: {
             vendor: {
-              select: { id: true, businessName: true, slug: true },
+              select: {
+                id: true,
+                businessName: true,
+                slug: true,
+                logoUrl: true,
+                coverUrl: true,
+              },
+            },
+          },
+        },
+        eventListings: {
+          orderBy: { addedAt: 'desc' },
+          include: {
+            listing: {
+              select: {
+                id: true,
+                title: true,
+                pricingType: true,
+                basePrice: true,
+                isRentable: true,
+                ratingAvg: true,
+                reviewCount: true,
+                vendorId: true,
+                media: {
+                  where: { type: 'IMAGE' },
+                  orderBy: { sortOrder: 'asc' },
+                  take: 1,
+                  select: { url: true },
+                },
+              },
             },
           },
         },
@@ -76,6 +111,8 @@ export class EventsService {
             quoteAmount: true,
           },
         },
+        // So the client can show "View" vs "Create" group chat.
+        groupConversation: { select: { id: true } },
       },
     });
     if (!event) throw new NotFoundException('Event not found');
@@ -128,8 +165,28 @@ export class EventsService {
     });
     if (existing) throw new ConflictException('Vendor is already added to this event');
 
-    return this.prisma.eventVendor.create({
+    const created = await this.prisma.eventVendor.create({
       data: { eventId, vendorId },
+    });
+    await this.syncVendorIntoEventGroup(eventId, vendorId);
+    return created;
+  }
+
+  /** If the event's group chat exists, add this vendor's user to it. Best-effort. */
+  private async syncVendorIntoEventGroup(eventId: string, vendorId: string) {
+    const group = await this.prisma.conversation.findUnique({
+      where: { eventId },
+      select: { id: true },
+    });
+    if (!group) return;
+    const vendor = await this.prisma.vendorProfile.findUnique({
+      where: { id: vendorId },
+      select: { userId: true },
+    });
+    if (!vendor) return;
+    await this.prisma.conversationParticipant.createMany({
+      data: [{ conversationId: group.id, userId: vendor.userId }],
+      skipDuplicates: true,
     });
   }
 
@@ -142,5 +199,41 @@ export class EventsService {
     if (!eventVendor) throw new NotFoundException('Vendor not found on this event');
 
     return this.prisma.eventVendor.delete({ where: { id: eventVendor.id } });
+  }
+
+  /**
+   * Adds a specific product/service (listing) to an event, and sources its
+   * vendor too (so the Vendors tab stays in sync). Idempotent.
+   */
+  async addListing(eventId: string, userId: string, listingId: string) {
+    await this.getEventForOwner(eventId, userId);
+
+    const listing = await this.prisma.listing.findUnique({
+      where: { id: listingId },
+      select: { id: true, vendorId: true },
+    });
+    if (!listing) throw new NotFoundException('Listing not found');
+
+    await this.prisma.$transaction([
+      this.prisma.eventListing.upsert({
+        where: { eventId_listingId: { eventId, listingId } },
+        create: { eventId, listingId },
+        update: {},
+      }),
+      this.prisma.eventVendor.upsert({
+        where: { eventId_vendorId: { eventId, vendorId: listing.vendorId } },
+        create: { eventId, vendorId: listing.vendorId },
+        update: {},
+      }),
+    ]);
+
+    await this.syncVendorIntoEventGroup(eventId, listing.vendorId);
+    return { added: true };
+  }
+
+  async removeListing(eventId: string, userId: string, listingId: string) {
+    await this.getEventForOwner(eventId, userId);
+    await this.prisma.eventListing.deleteMany({ where: { eventId, listingId } });
+    return { removed: true };
   }
 }

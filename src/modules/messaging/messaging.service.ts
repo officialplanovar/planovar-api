@@ -96,6 +96,63 @@ export class MessagingService {
     });
   }
 
+  /** User ids of every vendor currently sourced for an event. */
+  private async eventVendorUserIds(eventId: string): Promise<string[]> {
+    const rows = await this.prisma.eventVendor.findMany({
+      where: { eventId },
+      include: { vendor: { select: { userId: true } } },
+    });
+    return rows.map((r) => r.vendor.userId);
+  }
+
+  /**
+   * Get (or create) the single GROUP conversation for an event. On creation the
+   * client + all currently-sourced vendors are added; on fetch any newly-sourced
+   * vendors are synced in. Only the event owner (client) may call this.
+   */
+  async getOrCreateEventGroup(userId: string, eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { clientId: true, name: true },
+    });
+    if (!event) throw new NotFoundException('Event not found');
+    if (event.clientId !== userId) {
+      throw new ForbiddenException('Event does not belong to you');
+    }
+
+    const vendorUserIds = await this.eventVendorUserIds(eventId);
+    const wanted = Array.from(new Set([userId, ...vendorUserIds]));
+
+    const existing = await this.prisma.conversation.findUnique({
+      where: { eventId },
+      include: { participants: { select: { userId: true } } },
+    });
+
+    if (existing) {
+      const have = new Set(existing.participants.map((p) => p.userId));
+      const missing = wanted.filter((id) => !have.has(id));
+      if (missing.length) {
+        await this.prisma.conversationParticipant.createMany({
+          data: missing.map((uid) => ({ conversationId: existing.id, userId: uid })),
+          skipDuplicates: true,
+        });
+      }
+      return this.getConversation(existing.id, userId);
+    }
+
+    const created = await this.prisma.conversation.create({
+      data: {
+        type: 'GROUP',
+        clientId: userId,
+        eventId,
+        groupName: event.name,
+        participants: { create: wanted.map((uid) => ({ userId: uid })) },
+      },
+      select: { id: true },
+    });
+    return this.getConversation(created.id, userId);
+  }
+
   async addGroupParticipant(
     conversationId: string,
     requesterId: string,
@@ -134,6 +191,9 @@ export class MessagingService {
             participants: {
               include: { user: { select: { id: true, name: true, image: true } } },
             },
+            vendor: {
+              select: { logoUrl: true, coverUrl: true, businessName: true },
+            },
             messages: {
               orderBy: { createdAt: 'desc' },
               take: 1,
@@ -160,6 +220,9 @@ export class MessagingService {
       include: {
         participants: {
           include: { user: { select: { id: true, name: true, image: true } } },
+        },
+        vendor: {
+          select: { logoUrl: true, coverUrl: true, businessName: true },
         },
         messages: {
           orderBy: { createdAt: 'asc' },
@@ -264,6 +327,25 @@ export class MessagingService {
       include: {
         sender: { select: { id: true, name: true, image: true } },
         attachments: true,
+        // Structured-card payloads so the client can render quote/invoice/
+        // milestone/order/to-do cards inline.
+        quote: { include: { lineItems: { orderBy: { sortOrder: 'asc' } } } },
+        invoice: {
+          include: {
+            lineItems: { orderBy: { sortOrder: 'asc' } },
+            milestones: { orderBy: { sortOrder: 'asc' } },
+          },
+        },
+        booking: {
+          select: {
+            id: true,
+            status: true,
+            fulfilmentType: true,
+            finalAmount: true,
+            listing: { select: { title: true } },
+          },
+        },
+        todo: { include: { assignments: true } },
       },
     });
   }
@@ -275,6 +357,15 @@ export class MessagingService {
       where: { conversationId_userId: { conversationId, userId } },
     });
     return !!p;
+  }
+
+  /** All participant user ids of a conversation (for per-user room delivery). */
+  async participantUserIds(conversationId: string): Promise<string[]> {
+    const rows = await this.prisma.conversationParticipant.findMany({
+      where: { conversationId },
+      select: { userId: true },
+    });
+    return rows.map((r) => r.userId);
   }
 
   private async assertParticipant(

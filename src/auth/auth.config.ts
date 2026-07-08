@@ -151,6 +151,12 @@ export const auth = betterAuth({
         required: false,
         input: true,
       },
+      // ISO date string (YYYY-MM-DD), supplied at vendor signup.
+      dateOfBirth: {
+        type: 'string',
+        required: false,
+        input: true,
+      },
       isActive: {
         type: 'boolean',
         defaultValue: true,

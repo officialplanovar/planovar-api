@@ -54,13 +54,13 @@ export class UsersService {
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {
-    const { preferredCountryId, preferredCityId, firstName, lastName, phone, ...rest } = dto;
+    const { preferredCountryId, preferredCityId, firstName, lastName, phone, dateOfBirth, ...rest } = dto;
 
     await this.prisma.$transaction(async (tx) => {
       // Update core user fields
       await tx.user.update({
         where: { id: userId },
-        data: { firstName, lastName, phone },
+        data: { firstName, lastName, phone, dateOfBirth },
       });
 
       // Upsert client profile with location preference
@@ -175,39 +175,112 @@ export class UsersService {
     return { favourited: false };
   }
 
-  async listFavourites(userId: string) {
-    return this.prisma.favourite.findMany({
-      where: { userId },
+  // ─── Vendor favourites ──────────────────────────────────────────────────────
+
+  async addVendorFavourite(userId: string, vendorId: string) {
+    const vendor = await this.prisma.vendorProfile.findUnique({
+      where: { id: vendorId },
+      select: { id: true },
+    });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    await this.prisma.favourite.upsert({
+      where: {
+        userId_type_referenceId: {
+          userId,
+          type: FavouriteType.VENDOR,
+          referenceId: vendorId,
+        },
+      },
+      create: { userId, type: FavouriteType.VENDOR, referenceId: vendorId },
+      update: {},
+    });
+
+    return { favourited: true };
+  }
+
+  async removeVendorFavourite(userId: string, vendorId: string) {
+    await this.prisma.favourite.deleteMany({
+      where: { userId, type: FavouriteType.VENDOR, referenceId: vendorId },
+    });
+    return { favourited: false };
+  }
+
+  async listVendorFavourites(userId: string) {
+    const favs = await this.prisma.favourite.findMany({
+      where: { userId, type: FavouriteType.VENDOR },
       orderBy: { createdAt: 'desc' },
+      select: { referenceId: true },
+    });
+    const ids = favs.map((f) => f.referenceId);
+    if (ids.length === 0) return [];
+
+    const vendors = await this.prisma.vendorProfile.findMany({
+      where: { id: { in: ids } },
       select: {
-        listing: {
+        id: true,
+        businessName: true,
+        slug: true,
+        description: true,
+        logoUrl: true,
+        coverUrl: true,
+        location: true,
+        tags: true,
+        ratingAvg: true,
+        reviewCount: true,
+        subscriptionTier: true,
+        isVerified: true,
+      },
+    });
+    // Preserve most-recently-favourited order.
+    const byId = new Map(vendors.map((v) => [v.id, v]));
+    return ids.map((id) => byId.get(id)).filter(Boolean);
+  }
+
+  async listFavourites(userId: string) {
+    // Listing favourites only. referenceId is polymorphic (no FK), so fetch the
+    // listings manually and return them in the { listing } shape the client maps.
+    const favs = await this.prisma.favourite.findMany({
+      where: { userId, type: FavouriteType.LISTING },
+      orderBy: { createdAt: 'desc' },
+      select: { referenceId: true },
+    });
+    const ids = favs.map((f) => f.referenceId);
+    if (ids.length === 0) return [];
+
+    const listings = await this.prisma.listing.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        title: true,
+        pricingType: true,
+        basePrice: true,
+        ratingAvg: true,
+        reviewCount: true,
+        tags: true,
+        isActive: true,
+        category: { select: { id: true, name: true, slug: true } },
+        vendor: {
           select: {
             id: true,
-            title: true,
-            pricingType: true,
-            basePrice: true,
-            ratingAvg: true,
-            reviewCount: true,
-            tags: true,
-            isActive: true,
-            category: { select: { id: true, name: true, slug: true } },
-            vendor: {
-              select: {
-                id: true,
-                businessName: true,
-                slug: true,
-                isVerified: true,
-                subscriptionTier: true,
-              },
-            },
-            media: {
-              take: 1,
-              orderBy: { sortOrder: 'asc' as const },
-              select: { id: true, url: true, type: true },
-            },
+            businessName: true,
+            slug: true,
+            isVerified: true,
+            subscriptionTier: true,
           },
+        },
+        media: {
+          take: 1,
+          orderBy: { sortOrder: 'asc' as const },
+          select: { id: true, url: true, type: true },
         },
       },
     });
+    // Preserve most-recently-favourited order; wrap as { listing } for the client.
+    const byId = new Map(listings.map((l) => [l.id, l]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((l): l is NonNullable<typeof l> => Boolean(l))
+      .map((listing) => ({ listing }));
   }
 }

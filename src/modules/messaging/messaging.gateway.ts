@@ -4,18 +4,20 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { auth } from '../../auth/auth.config';
+import { ChatRealtimeService } from '../../common/realtime/chat-realtime.service';
 import { MessagingService } from './messaging.service';
 import { MessageType } from '@prisma/client';
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/chat' })
 export class MessagingGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
 {
   private readonly logger = new Logger(MessagingGateway.name);
 
@@ -24,7 +26,13 @@ export class MessagingGateway
 
   constructor(
     @Inject(MessagingService) private readonly messagingService: MessagingService,
+    @Inject(ChatRealtimeService) private readonly realtime: ChatRealtimeService,
   ) {}
+
+  afterInit(server: Server): void {
+    // Share the socket server so non-gateway code can push card messages.
+    this.realtime.setServer(server);
+  }
 
   async handleConnection(client: Socket): Promise<void> {
     try {
@@ -47,6 +55,10 @@ export class MessagingGateway
       }
 
       client.data.userId = session.user.id;
+      // Personal room — receives message events for ALL the user's
+      // conversations, so the conversation list updates live (incl. brand-new
+      // conversations) without joining each room.
+      await client.join(ChatRealtimeService.userRoom(session.user.id));
       client.emit('connected', { userId: session.user.id });
       this.logger.log(`Client connected: ${session.user.id}`);
     } catch (err) {
@@ -121,7 +133,13 @@ export class MessagingGateway
       },
     );
 
-    this.server.to(payload.conversationId).emit('message', savedMessage);
+    // Broadcast via the realtime service (the namespace server captured in
+    // afterInit) so text and structured cards share one correct path. Also
+    // delivers to each participant's personal room (list screens, etc.).
+    const participantIds = await this.messagingService.participantUserIds(
+      payload.conversationId,
+    );
+    this.realtime.emitMessage(payload.conversationId, savedMessage, participantIds);
     return savedMessage;
   }
 

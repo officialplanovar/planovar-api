@@ -3,10 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Inject,
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +19,7 @@ import {
   ApiParam,
   ApiProperty,
   ApiPropertyOptional,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { MediaType } from '@prisma/client';
@@ -69,11 +72,45 @@ export class ListingsController {
     return this.listingsService.findAllForUser((req as any).user.id);
   }
 
+  @Get('browse')
+  @ApiOperation({
+    summary:
+      'Browse active listings from verified vendors (public, DB-backed — no search dependency)',
+  })
+  @ApiQuery({ name: 'pricingType', required: false, description: 'e.g. FIXED for products' })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiQuery({ name: 'isRentable', required: false, type: 'boolean' })
+  @ApiQuery({ name: 'take', required: false, type: 'number' })
+  @ApiQuery({ name: 'skip', required: false, type: 'number' })
+  browse(
+    @Query('pricingType') pricingType?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('isRentable') isRentable?: string,
+    @Query('take') take?: string,
+    @Query('skip') skip?: string,
+  ) {
+    return this.listingsService.browse({
+      pricingType,
+      categoryId,
+      isRentable: isRentable == null ? undefined : isRentable === 'true',
+      take: take ? parseInt(take, 10) : undefined,
+      skip: skip ? parseInt(skip, 10) : undefined,
+    });
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a single listing (public)' })
   @ApiParam({ name: 'id', description: 'Listing UUID' })
   findOne(@Param('id') id: string) {
     return this.listingsService.findOne(id);
+  }
+
+  @Post(':id/view')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Record a view (increments viewCount, public)' })
+  @ApiParam({ name: 'id', description: 'Listing UUID' })
+  recordView(@Param('id') id: string) {
+    return this.listingsService.recordView(id);
   }
 
   @Patch(':id')

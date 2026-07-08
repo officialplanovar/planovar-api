@@ -59,7 +59,7 @@ export class QuotesService {
       include: { booking: { select: { clientId: true } } },
     });
     if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.booking.clientId !== userId) throw new ForbiddenException('Not your quote');
+    if (quote.booking?.clientId !== userId) throw new ForbiddenException('Not your quote');
     return { quote };
   }
 
@@ -197,7 +197,7 @@ export class QuotesService {
     if (!quote) throw new NotFoundException('Quote not found');
 
     const isVendor = quote.vendor.userId === userId;
-    const isClient = quote.booking.clientId === userId;
+    const isClient = quote.booking?.clientId === userId;
     if (!isVendor && !isClient) throw new NotFoundException('Quote not found');
 
     return quote;
@@ -283,6 +283,9 @@ export class QuotesService {
       throw new ConflictException('This quote has expired — ask the vendor to re-issue it');
     }
 
+    if (!quote.bookingId) {
+      throw new ConflictException('This quote is not linked to a booking');
+    }
     const booking = await this.prisma.booking.findUnique({
       where: { id: quote.bookingId },
       select: { id: true, status: true },
@@ -335,6 +338,9 @@ export class QuotesService {
         : []),
     ]);
 
+    if (!updated.booking) {
+      throw new ConflictException('This quote is not linked to a booking');
+    }
     const vendorName =
       updated.vendor.user.firstName ?? updated.vendor.user.name ?? updated.vendor.businessName;
     const clientName =
@@ -399,8 +405,8 @@ export class QuotesService {
         updated.vendor.userId,
         NotificationType.QUOTE_REJECTED,
         'Quote declined',
-        `Your quote for "${updated.booking.listing.title}" was declined — the conversation stays open`,
-        { quoteId: id, bookingId: updated.bookingId },
+        `Your quote for "${updated.booking?.listing.title ?? 'your service'}" was declined — the conversation stays open`,
+        { quoteId: id, ...(updated.bookingId ? { bookingId: updated.bookingId } : {}) },
       )
       .catch(() => void 0);
 

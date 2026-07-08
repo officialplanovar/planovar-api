@@ -1,10 +1,11 @@
 import {
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MediaType, Prisma, SubscriptionTier } from '@prisma/client';
+import { MediaType, PricingType, Prisma, SubscriptionTier } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { TypesenseSyncService } from '../../common/typesense/typesense-sync.service';
@@ -53,6 +54,11 @@ export class ListingsService {
         isRentable: dto.isRentable ?? false,
         perDayRate: dto.perDayRate != null ? new Prisma.Decimal(dto.perDayRate) : null,
         depositAmount: dto.depositAmount != null ? new Prisma.Decimal(dto.depositAmount) : null,
+        sku: dto.sku ?? null,
+        stockQuantity: dto.stockQuantity ?? null,
+        durationValue: dto.durationValue ?? null,
+        durationUnit: dto.durationUnit ?? null,
+        cancellationPolicy: dto.cancellationPolicy ?? null,
         tags: dto.tags ?? [],
         ...(dto.mediaUrls?.length
           ? {
@@ -149,7 +155,9 @@ export class ListingsService {
             id: true,
             businessName: true,
             slug: true,
+            logoUrl: true,
             coverUrl: true,
+            location: true,
             isVerified: true,
             ratingAvg: true,
             reviewCount: true,
@@ -162,6 +170,64 @@ export class ListingsService {
 
     await this.redis.setJson(cacheKey, listing, CACHE_TTL);
     return listing;
+  }
+
+  /**
+   * Public browse of active listings from verified vendors, straight from the
+   * DB. This is the reliable path for product/service listing pages — it does
+   * NOT depend on Typesense (which is only for full-text search). Filter by
+   * pricingType (e.g. FIXED for products), category, or rentability.
+   */
+  async browse(opts: {
+    pricingType?: string;
+    categoryId?: string;
+    isRentable?: boolean;
+    take?: number;
+    skip?: number;
+  }) {
+    const pricingType =
+      opts.pricingType && opts.pricingType in PricingType
+        ? (opts.pricingType as PricingType)
+        : undefined;
+
+    const where: Prisma.ListingWhereInput = {
+      isActive: true,
+      // Business rule: clients only see listings from verified vendors.
+      vendor: { isVerified: true },
+      ...(pricingType ? { pricingType } : {}),
+      ...(opts.categoryId ? { categoryId: opts.categoryId } : {}),
+      ...(opts.isRentable != null ? { isRentable: opts.isRentable } : {}),
+    };
+
+    return this.prisma.listing.findMany({
+      where,
+      orderBy: [{ ratingAvg: 'desc' }, { createdAt: 'desc' }],
+      take: Math.min(Math.max(opts.take ?? 30, 1), 100),
+      skip: Math.max(opts.skip ?? 0, 0),
+      select: this.buildListingSelect(),
+    });
+  }
+
+  /**
+   * Record a client view: increments viewCount, then refreshes the cached
+   * listing and search doc so the new count is visible (the vendor reads it
+   * from their own listings list, which hits the DB directly).
+   * MVP counts every view; per-user/session dedup can be layered on later.
+   */
+  async recordView(id: string) {
+    const updated = await this.prisma.listing
+      .update({
+        where: { id },
+        data: { viewCount: { increment: 1 } },
+        select: { id: true, viewCount: true },
+      })
+      .catch(() => null);
+
+    if (!updated) throw new NotFoundException('Listing not found');
+
+    await this.redis.del(RedisService.keys.listing(id));
+    this.syncListingToSearch(id).catch(() => void 0);
+    return updated;
   }
 
   async update(id: string, userId: string, dto: UpdateListingDto) {
@@ -186,6 +252,13 @@ export class ListingsService {
         ...(dto.depositAmount !== undefined && {
           depositAmount: dto.depositAmount != null ? new Prisma.Decimal(dto.depositAmount) : null,
         }),
+        ...(dto.sku !== undefined && { sku: dto.sku ?? null }),
+        ...(dto.stockQuantity !== undefined && { stockQuantity: dto.stockQuantity ?? null }),
+        ...(dto.durationValue !== undefined && { durationValue: dto.durationValue ?? null }),
+        ...(dto.durationUnit !== undefined && { durationUnit: dto.durationUnit ?? null }),
+        ...(dto.cancellationPolicy !== undefined && {
+          cancellationPolicy: dto.cancellationPolicy ?? null,
+        }),
         ...(dto.tags !== undefined && { tags: dto.tags }),
       },
       select: this.buildListingSelect(),
@@ -199,21 +272,30 @@ export class ListingsService {
   async remove(id: string, userId: string) {
     const listing = await this.assertOwnership(id, userId);
 
-    const updated = await this.prisma.listing.update({
-      where: { id },
-      data: { isActive: false },
-      select: { id: true, isActive: true },
-    });
+    try {
+      // Hard delete — the row is removed entirely. Cascades take care of
+      // media, packages and favourites (see schema onDelete: Cascade).
+      await this.prisma.listing.delete({ where: { id } });
+    } catch (e) {
+      // A listing referenced by bookings can't be hard-deleted (FK restrict);
+      // don't erase transactional history — tell the vendor to deactivate.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ConflictException(
+          'This listing has existing bookings and cannot be deleted. Deactivate it instead.',
+        );
+      }
+      throw e;
+    }
 
     await this.redis.del(
       RedisService.keys.listing(id),
       RedisService.keys.vendor(listing.vendorId),
     );
 
-    // Remove from search index — inactive listings shouldn't appear
+    // Remove from the search index
     this.sync.deleteListing(id).catch(() => void 0);
 
-    return updated;
+    return { id, deleted: true };
   }
 
   async addMedia(listingId: string, userId: string, mediaData: AddMediaData) {
@@ -304,6 +386,11 @@ export class ListingsService {
       isRentable: true,
       perDayRate: true,
       depositAmount: true,
+      sku: true,
+      stockQuantity: true,
+      durationValue: true,
+      durationUnit: true,
+      cancellationPolicy: true,
       ratingAvg: true,
       reviewCount: true,
       viewCount: true,

@@ -8,12 +8,15 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TYPESENSE_CLIENT } from '../../common/typesense/typesense.provider';
 import {
   LISTINGS_COLLECTION,
+  listingsSchema,
 } from '../../common/typesense/schemas/listings.schema';
 import {
   VENDORS_COLLECTION,
+  vendorsSchema,
 } from '../../common/typesense/schemas/vendors.schema';
 import {
   EVENTS_COLLECTION,
+  eventsSchema,
 } from '../../common/typesense/schemas/events.schema';
 
 export interface PaginatedSearchResult<T = any> {
@@ -53,6 +56,78 @@ export class SearchService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
+  // ─── Health ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Reports Typesense reachability and, per collection, whether it exists, its
+   * document count, and any schema fields defined in code but missing live
+   * (the drift that surfaces as 503s on search). Never throws.
+   */
+  async health() {
+    let reachable = false;
+    try {
+      const h = await this.typesense.health.retrieve();
+      reachable = !!h?.ok;
+    } catch {
+      reachable = false;
+    }
+
+    const defs = [
+      { name: LISTINGS_COLLECTION, schema: listingsSchema },
+      { name: VENDORS_COLLECTION, schema: vendorsSchema },
+      { name: EVENTS_COLLECTION, schema: eventsSchema },
+    ];
+
+    const collections: Array<{
+      collection: string;
+      exists: boolean;
+      numDocuments: number;
+      missingFields: string[];
+      inSync: boolean;
+      error?: string;
+    }> = [];
+
+    if (reachable) {
+      for (const def of defs) {
+        const codeFields = def.schema.fields.map((f: any) => f.name as string);
+        try {
+          const live = await this.typesense.collections(def.name).retrieve();
+          const liveFields = new Set(
+            (live.fields ?? []).map((f: any) => f.name as string),
+          );
+          const missingFields = codeFields.filter((n) => !liveFields.has(n));
+          collections.push({
+            collection: def.name,
+            exists: true,
+            numDocuments: (live as any).num_documents ?? 0,
+            missingFields,
+            inSync: missingFields.length === 0,
+          });
+        } catch (err: any) {
+          // 404 = collection not created yet; anything else = a real error.
+          collections.push({
+            collection: def.name,
+            exists: false,
+            numDocuments: 0,
+            missingFields: codeFields,
+            inSync: false,
+            ...(err?.httpStatus && err.httpStatus !== 404
+              ? { error: err?.message ?? String(err) }
+              : {}),
+          });
+        }
+      }
+    }
+
+    const status = !reachable
+      ? 'unreachable'
+      : collections.every((c) => c.exists && c.inSync)
+        ? 'ok'
+        : 'degraded';
+
+    return { status, reachable, collections };
+  }
+
   // ─── Listings ──────────────────────────────────────────────────────────────
 
   async searchListings(
@@ -62,7 +137,8 @@ export class SearchService {
     perPage = 20,
   ): Promise<PaginatedSearchResult> {
     try {
-      const filterParts: string[] = ['isActive:=true'];
+      // Clients only see active listings from verified vendors.
+      const filterParts: string[] = ['isActive:=true', 'vendorVerified:=true'];
 
       if (filters.categoryId) {
         filterParts.push(`categoryId:=${filters.categoryId}`);
@@ -95,17 +171,40 @@ export class SearchService {
         ? '_text_match:desc,rating:desc'
         : 'rating:desc';
 
-      const result = await this.typesense
-        .collections(LISTINGS_COLLECTION)
-        .documents()
-        .search({
-          q: hasQuery ? query : '*',
-          query_by: 'title,description,tags',
-          filter_by: filterParts.join(' && '),
-          sort_by: sortBy,
-          page,
-          per_page: perPage,
-        });
+      const runSearch = (parts: string[]) =>
+        this.typesense
+          .collections(LISTINGS_COLLECTION)
+          .documents()
+          .search({
+            q: hasQuery ? query : '*',
+            query_by: 'title,description,tags',
+            filter_by: parts.join(' && '),
+            sort_by: sortBy,
+            page,
+            per_page: perPage,
+          });
+
+      let result;
+      try {
+        result = await runSearch(filterParts);
+      } catch (err: any) {
+        // Schema drift: a filter field (e.g. vendorVerified) isn't on the live
+        // collection yet. Degrade instead of 503-ing — retry without it. The
+        // collection needs a reindex (POST /search/admin/sync) to fully heal.
+        if (
+          err?.httpStatus === 400 &&
+          /Could not find a filter field/i.test(String(err?.message ?? ''))
+        ) {
+          console.warn(
+            '[Typesense] listings schema drift — retrying without the vendorVerified filter. Run POST /search/admin/sync to heal.',
+          );
+          result = await runSearch(
+            filterParts.filter((p) => !p.startsWith('vendorVerified')),
+          );
+        } else {
+          throw err;
+        }
+      }
 
       return {
         page,
@@ -128,7 +227,8 @@ export class SearchService {
     perPage = 20,
   ): Promise<PaginatedSearchResult> {
     try {
-      const filterParts: string[] = [];
+      // Clients only ever see verified vendors.
+      const filterParts: string[] = ['isVerified:=true'];
 
       if (filters.subscriptionTier) {
         filterParts.push(`subscriptionTier:=${filters.subscriptionTier}`);
@@ -138,9 +238,6 @@ export class SearchService {
       }
       if (filters.country) {
         filterParts.push(`country:=${filters.country}`);
-      }
-      if (filters.isVerified != null) {
-        filterParts.push(`isVerified:=${filters.isVerified}`);
       }
 
       const hasQuery = !!query && query.trim().length > 0;
@@ -232,6 +329,7 @@ export class SearchService {
 
       const filterParts: string[] = [
         'isActive:=true',
+        'vendorVerified:=true',
         `id:!=${listingId}`,
       ];
 
@@ -276,7 +374,7 @@ export class SearchService {
       if (listings.length === 0) return [];
 
       const vendorIds = listings.map((l) => l.vendorId);
-      const filterBy = `id:[${vendorIds.join(',')}]`;
+      const filterBy = `id:[${vendorIds.join(',')}] && isVerified:=true`;
 
       const result = await this.typesense
         .collections(VENDORS_COLLECTION)

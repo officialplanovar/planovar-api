@@ -36,6 +36,17 @@ export class SearchController {
     @Inject(TypesenseSyncService) private readonly syncService: TypesenseSyncService,
   ) {}
 
+  // ─── Health ────────────────────────────────────────────────────────────────
+
+  @Get('health')
+  @ApiOperation({
+    summary:
+      'Typesense health: reachability + per-collection doc counts and schema drift',
+  })
+  health() {
+    return this.searchService.health();
+  }
+
   // ─── Listings ──────────────────────────────────────────────────────────────
 
   @Get('listings')

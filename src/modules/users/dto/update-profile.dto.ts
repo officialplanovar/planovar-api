@@ -17,6 +17,11 @@ export class UpdateProfileDto {
   @IsOptional()
   phone?: string;
 
+  @ApiPropertyOptional({ type: 'string', example: '2000-01-15', description: 'ISO date YYYY-MM-DD' })
+  @IsString()
+  @IsOptional()
+  dateOfBirth?: string;
+
   @ApiPropertyOptional({ type: 'string', description: 'Country UUID from GET /locations/countries' })
   @IsUUID()
   @IsOptional()

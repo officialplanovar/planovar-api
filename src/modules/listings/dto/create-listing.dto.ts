@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -80,4 +81,34 @@ export class CreateListingDto {
   @IsArray()
   @IsString({ each: true })
   mediaUrls?: string[];
+
+  @ApiPropertyOptional({ type: 'string', description: 'Product SKU', example: 'CAT-PHO-42381' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  sku?: string;
+
+  @ApiPropertyOptional({ type: 'number', description: 'Units in stock (products)', example: 50 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  stockQuantity?: number;
+
+  @ApiPropertyOptional({ type: 'number', description: 'Service duration value', example: 2 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  durationValue?: number;
+
+  @ApiPropertyOptional({ type: 'string', description: 'Service duration unit', example: 'Hours' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  durationUnit?: string;
+
+  @ApiPropertyOptional({ type: 'string', description: 'Cancellation policy: Flexible | Moderate | Strict', example: 'Moderate' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  cancellationPolicy?: string;
 }

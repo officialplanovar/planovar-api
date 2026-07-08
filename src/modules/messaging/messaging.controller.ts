@@ -63,6 +63,17 @@ export class MessagingController {
     );
   }
 
+  @Post('events/:eventId/group')
+  @ApiOperation({
+    summary: 'Get or create the event GROUP chat (auto-adds all event vendors)',
+  })
+  getOrCreateEventGroup(@Req() req: Request, @Param('eventId') eventId: string) {
+    return this.messagingService.getOrCreateEventGroup(
+      (req as any).user.id,
+      eventId,
+    );
+  }
+
   @Get()
   @ApiOperation({ summary: "List the current user's conversations" })
   listConversations(@Req() req: Request) {

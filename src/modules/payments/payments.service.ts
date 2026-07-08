@@ -25,6 +25,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { InvoiceService } from '../chat-orders/invoice.service';
 
 @Injectable()
 export class PaymentsService {
@@ -36,6 +37,7 @@ export class PaymentsService {
     @Inject(ConfigService) private readonly config: ConfigService,
     @Inject(EmailService) private readonly email: EmailService,
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
+    @Inject(InvoiceService) private readonly invoices: InvoiceService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -62,6 +64,9 @@ export class PaymentsService {
     if (!installment) throw new NotFoundException('Installment not found');
 
     const booking = installment.quote.booking;
+    if (!booking) {
+      throw new ConflictException('This installment is not linked to a booking');
+    }
 
     // Only the booking client may pay
     if (booking.clientId !== userId) {
@@ -251,6 +256,17 @@ export class PaymentsService {
     const reference = event.data.reference as string | undefined;
     if (!reference) return;
 
+    // Direct-pay milestone charges (chat-order flow) carry a `PM_` reference and
+    // live on paymentMilestone, not the transactions table — route them there.
+    if (reference.startsWith('PM_')) {
+      try {
+        await this.invoices.confirmByReference(reference);
+      } catch (err) {
+        this.logger.error(`Milestone webhook error for reference ${reference}`, err);
+      }
+      return;
+    }
+
     try {
       const transaction = await this.prisma.transaction.findUnique({
         where: { paystackReference: reference },
@@ -371,6 +387,9 @@ export class PaymentsService {
     }
 
     const booking = installment.quote.booking;
+    if (!booking) {
+      throw new ConflictException('This installment is not linked to a booking');
+    }
     const vendor = booking.vendor;
     const amount = transaction.amount.toNumber();
 

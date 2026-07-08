@@ -107,6 +107,8 @@ export class AdminService {
           subscriptionTier: true,
           kycStatus: true,
           isVerified: true,
+          ninDocumentUrl: true,
+          cacDocumentUrl: true,
           kycSubmittedAt: true,
           createdAt: true,
           user: {

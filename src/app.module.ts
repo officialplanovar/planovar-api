@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 
 // Infrastructure (global — available to every feature module)
 import { PrismaModule } from './prisma/prisma.module';
+import { ChatRealtimeModule } from './common/realtime/chat-realtime.module';
 import { RedisModule } from './common/redis/redis.module';
 import { UploadModule } from './common/upload/upload.module';
 import { EmailModule } from './common/email/email.module';
@@ -26,6 +27,7 @@ import { ListingsModule } from './modules/listings/listings.module';
 import { EventsModule } from './modules/events/events.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
+import { ChatOrdersModule } from './modules/chat-orders/chat-orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PayoutsModule } from './modules/payouts/payouts.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -43,6 +45,7 @@ import { SearchModule } from './modules/search/search.module';
 
     // ─── Infrastructure ───────────────────────────────────────────────────
     PrismaModule,
+    ChatRealtimeModule,
     RedisModule,
     EmailModule,
     FirebaseModule,
@@ -66,6 +69,7 @@ import { SearchModule } from './modules/search/search.module';
     EventsModule,
     BookingsModule,
     QuotesModule,
+    ChatOrdersModule,
     PaymentsModule,
     PayoutsModule,
     SubscriptionsModule,

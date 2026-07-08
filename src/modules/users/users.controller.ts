@@ -62,6 +62,32 @@ export class UsersController {
     return this.usersService.listFavourites((req as any).user.id);
   }
 
+  // Vendor favourites — declared before the :listingId routes so the static
+  // 'vendors' segment isn't captured as a listing id.
+  @Get('me/favourites/vendors')
+  @ApiOperation({ summary: 'List all favourited vendors' })
+  listVendorFavourites(@Req() req: Request) {
+    return this.usersService.listVendorFavourites((req as any).user.id);
+  }
+
+  @Post('me/favourites/vendors/:vendorId')
+  @ApiOperation({ summary: 'Add a vendor to favourites' })
+  addVendorFavourite(@Req() req: Request, @Param('vendorId') vendorId: string) {
+    return this.usersService.addVendorFavourite((req as any).user.id, vendorId);
+  }
+
+  @Delete('me/favourites/vendors/:vendorId')
+  @ApiOperation({ summary: 'Remove a vendor from favourites' })
+  removeVendorFavourite(
+    @Req() req: Request,
+    @Param('vendorId') vendorId: string,
+  ) {
+    return this.usersService.removeVendorFavourite(
+      (req as any).user.id,
+      vendorId,
+    );
+  }
+
   @Post('me/favourites/:listingId')
   @ApiOperation({ summary: 'Add a listing to favourites' })
   addFavourite(@Req() req: Request, @Param('listingId') listingId: string) {

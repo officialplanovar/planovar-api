@@ -88,4 +88,36 @@ export class EventsController {
   ) {
     return this.eventsService.removeVendor(id, (req as any).user.id, vendorId);
   }
+
+  @Post(':id/listings')
+  @ApiOperation({ summary: 'Add a product/service (listing) to an event' })
+  @ApiParam({ name: 'id', description: 'Event UUID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['listingId'],
+      properties: {
+        listingId: { type: 'string', format: 'uuid' },
+      },
+    },
+  })
+  addListing(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body('listingId') listingId: string,
+  ) {
+    return this.eventsService.addListing(id, (req as any).user.id, listingId);
+  }
+
+  @Delete(':id/listings/:listingId')
+  @ApiOperation({ summary: 'Remove a listing from an event' })
+  @ApiParam({ name: 'id', description: 'Event UUID' })
+  @ApiParam({ name: 'listingId', description: 'Listing UUID' })
+  removeListing(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Param('listingId') listingId: string,
+  ) {
+    return this.eventsService.removeListing(id, (req as any).user.id, listingId);
+  }
 }

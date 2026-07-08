@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -66,6 +68,20 @@ export class VendorsController {
   @ApiParam({ name: 'slug', description: 'Vendor slug' })
   getBySlug(@Param('slug') slug: string) {
     return this.vendorsService.getBySlug(slug);
+  }
+
+  @Get('browse')
+  @ApiOperation({
+    summary:
+      'Browse verified vendors (public, DB-backed — no search dependency)',
+  })
+  @ApiQuery({ name: 'take', required: false, type: 'number' })
+  @ApiQuery({ name: 'skip', required: false, type: 'number' })
+  browse(@Query('take') take?: string, @Query('skip') skip?: string) {
+    return this.vendorsService.browse({
+      take: take ? parseInt(take, 10) : undefined,
+      skip: skip ? parseInt(skip, 10) : undefined,
+    });
   }
 
   @Get(':id')

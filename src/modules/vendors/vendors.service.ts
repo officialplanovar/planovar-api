@@ -206,6 +206,22 @@ export class VendorsService {
     return vendor;
   }
 
+  /**
+   * Public browse of verified vendors, straight from the DB (no Typesense).
+   * Reliable path for category/discovery pages — returns the full profile
+   * shape (incl. coverUrl/tags) so cards render images without a reindex.
+   * Category filtering stays client-side (tag-based), matching prior behavior.
+   */
+  async browse(opts: { take?: number; skip?: number } = {}) {
+    return this.prisma.vendorProfile.findMany({
+      where: { isVerified: true },
+      orderBy: { ratingAvg: 'desc' },
+      take: Math.min(Math.max(opts.take ?? 60, 1), 100),
+      skip: Math.max(opts.skip ?? 0, 0),
+      select: this.buildVendorSelect(),
+    });
+  }
+
   async getBySlug(slug: string) {
     const cacheKey = RedisService.keys.vendorBySlug(slug);
     const cached = await this.redis.getJson(cacheKey);
@@ -366,6 +382,12 @@ export class VendorsService {
       RedisService.keys.vendor(vendor.id),
       RedisService.keys.vendorBySlug(vendor.slug),
     );
+
+    // On approval, re-index the vendor + its listings so vendorVerified flips
+    // and they become discoverable to clients. Best-effort.
+    if (approve) {
+      this.sync.reindexVendorAndListings(vendor.id).catch(() => void 0);
+    }
     return updated;
   }
 
