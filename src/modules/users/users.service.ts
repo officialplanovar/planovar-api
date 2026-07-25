@@ -27,6 +27,11 @@ export class UsersService {
         firstName: true,
         lastName: true,
         createdAt: true,
+        // Presence lets the apps enforce role separation (client vs vendor)
+        // and resume onboarding at the right step.
+        vendorProfile: {
+          select: { id: true, subscriptionTier: true, kycStatus: true },
+        },
         clientProfile: {
           select: {
             id: true,

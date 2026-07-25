@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -23,6 +24,37 @@ export class VendorsService {
     @Inject(RedisService) private readonly redis: RedisService,
     @Inject(TypesenseSyncService) private readonly sync: TypesenseSyncService,
   ) {}
+
+  /**
+   * Types a brand-new account as a VENDOR at vendor-app sign-up, so the vendor
+   * app's role gate lets them through. Refused for established clients (a
+   * client who has completed client onboarding) — that enforces the one-role-
+   * per-account separation. Idempotent for accounts already typed VENDOR.
+   */
+  async claimVendorIntent(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: true,
+        vendorProfile: { select: { id: true } },
+        clientProfile: { select: { onboardingComplete: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.role === 'VENDOR' || user.vendorProfile) {
+      return { role: 'VENDOR' as const };
+    }
+    if (user.clientProfile?.onboardingComplete) {
+      throw new ForbiddenException(
+        'This account is registered as a client. Use a different account to sell on Planovar.',
+      );
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: 'VENDOR' },
+    });
+    return { role: 'VENDOR' as const };
+  }
 
   async onboard(userId: string, dto: OnboardVendorDto) {
     const existing = await this.prisma.vendorProfile.findUnique({

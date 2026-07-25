@@ -37,6 +37,17 @@ export class VendorsController {
     return this.vendorsService.onboard((req as any).user.id, dto);
   }
 
+  @Post('intent')
+  @UseGuards(SessionAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Type the current account as a vendor (called on vendor-app sign-up). Refused for established clients.',
+  })
+  claimIntent(@Req() req: Request) {
+    return this.vendorsService.claimVendorIntent((req as any).user.id);
+  }
+
   @Get('me')
   @UseGuards(SessionAuthGuard)
   @ApiBearerAuth()

@@ -1,7 +1,8 @@
-import { Controller, Get, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Inject, Query, Req, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request, Response } from 'express';
+import { PrismaService } from '../prisma/prisma.service';
 import { auth } from './auth.config';
 
 /**
@@ -62,16 +63,22 @@ function readSessionToken(req: Request): string | null {
 @ApiExcludeController()
 @Controller('oauth')
 export class OAuthRelayController {
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+  ) {}
+
   /**
    * Top-level entry point for social sign-in. Initiating OAuth from a
    * cross-origin SPA via XHR fails with `state_mismatch` because the browser
    * won't store Better Auth's SameSite=Lax state cookie from the XHR response.
    * Navigating the browser here (first-party to the API) sets that cookie
-   * correctly, then redirects to Google.
+   * correctly, then redirects to Google. `intent` (client|vendor) records which
+   * app the user signed up through, so the relay can type a brand-new account.
    */
   @Get('start')
   async start(
     @Query('redirect') redirect: string,
+    @Query('intent') intent: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
@@ -80,7 +87,9 @@ export class OAuthRelayController {
       return;
     }
     const base = process.env.API_BASE_URL ?? 'http://localhost:3000';
-    const callbackURL = `${base}/oauth/relay?redirect=${encodeURIComponent(redirect)}`;
+    const intentParam =
+      intent === 'vendor' || intent === 'client' ? `&intent=${intent}` : '';
+    const callbackURL = `${base}/oauth/relay?redirect=${encodeURIComponent(redirect)}${intentParam}`;
     const response = await auth.api.signInSocial({
       body: { provider: 'google', callbackURL },
       headers: fromNodeHeaders(req.headers),
@@ -105,14 +114,22 @@ export class OAuthRelayController {
   }
 
   @Get('relay')
-  relay(
+  async relay(
     @Query('redirect') redirect: string,
+    @Query('intent') intent: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
     if (!isAllowedRedirect(redirect)) {
       res.status(400).send('Invalid or missing redirect target');
       return;
+    }
+    // Type a brand-new account by the app it signed up through. Only ever
+    // promotes a just-created user to VENDOR — never re-types an existing
+    // account, so an established client signing into the vendor app stays a
+    // client (and is then blocked by the vendor app's gate).
+    if (intent === 'vendor') {
+      await this.typeNewVendor(req).catch(() => void 0);
     }
     const token = readSessionToken(req);
     const sep = redirect.includes('?') ? '&' : '?';
@@ -123,5 +140,23 @@ export class OAuthRelayController {
     res.redirect(
       `${redirect}${sep}planovar_token=${encodeURIComponent(token)}`,
     );
+  }
+
+  /** Promote a freshly-created OAuth user to VENDOR (vendor-app sign-up). */
+  private async typeNewVendor(req: Request): Promise<void> {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+    const user = session?.user as
+      | { id: string; role?: string; createdAt?: string | Date }
+      | undefined;
+    if (!user || user.role === 'VENDOR') return;
+    // Brand-new only: the callback created this user seconds ago.
+    const createdMs = user.createdAt ? new Date(user.createdAt).getTime() : 0;
+    if (Date.now() - createdMs > 60_000) return;
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { role: 'VENDOR' },
+    });
   }
 }
