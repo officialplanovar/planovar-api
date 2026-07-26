@@ -69,11 +69,22 @@ export class UsersService {
       });
 
       // Upsert client profile with location preference
-      await tx.clientProfile.upsert({
+      const profile = await tx.clientProfile.upsert({
         where: { userId },
         create: { userId, preferredCountryId, preferredCityId },
         update: { preferredCountryId, preferredCityId },
       });
+
+      // Essential onboarding = a location is set. Mark it complete so the
+      // client app stops routing the user back into onboarding (the category-
+      // preferences step, which also sets this, is skipped in the social-login
+      // onboarding flow).
+      if (profile.preferredCityId && !profile.onboardingComplete) {
+        await tx.clientProfile.update({
+          where: { id: profile.id },
+          data: { onboardingComplete: true },
+        });
+      }
     });
 
     return this.getMe(userId);
