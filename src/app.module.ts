@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // Infrastructure (global — available to every feature module)
 import { PrismaModule } from './prisma/prisma.module';
@@ -42,6 +43,7 @@ import { SearchModule } from './modules/search/search.module';
   imports: [
     // ─── Config ───────────────────────────────────────────────────────────
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
 
     // ─── Infrastructure ───────────────────────────────────────────────────
     PrismaModule,

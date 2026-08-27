@@ -3,8 +3,10 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { BillingCycle, Prisma, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PAYMENT_PROVIDER } from '../billing/payment-provider.interface';
@@ -60,12 +62,95 @@ const PLAN_PUBLIC_SELECT = {
   features: true,
 } as const;
 
+// Free-trial length for a vendor's first paid subscription (MoM #18).
+const TRIAL_DAYS = 45;
+// Grace window before a lapsed paid subscription is force-expired by the sweeper
+// (covers a delayed/missed renewal webhook).
+const RENEWAL_GRACE_DAYS = 3;
+
 @Injectable()
 export class SubscriptionsService {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(PAYMENT_PROVIDER) private readonly billing: PaymentProvider,
   ) {}
+
+  // ─── Scheduled: expire lapsed subscriptions ────────────────────────────────
+  // Renewals/expiry are normally driven by provider webhooks. This nightly
+  // sweeper is the safety net: it force-expires PAID subscriptions whose access
+  // window has clearly ended (trial over, non-renewing period ended, or a
+  // renewal that never confirmed within the grace window) and drops the vendor
+  // to BASIC. BASIC (free) subscriptions are never expired.
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  async expireLapsedSubscriptions() {
+    const now = new Date();
+    const graceCutoff = new Date(
+      now.getTime() - RENEWAL_GRACE_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const candidates = await this.prisma.vendorSubscription.findMany({
+      where: {
+        plan: { tier: { not: SubscriptionTier.BASIC } },
+        OR: [
+          // Free trial ended without converting to a paid charge.
+          { status: SubscriptionStatus.TRIALING, trialEndsAt: { lt: now } },
+          // Cancelled (won't renew) and the paid period has now ended.
+          {
+            status: SubscriptionStatus.ACTIVE,
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: { lt: now },
+          },
+          // Failed charge whose retries are exhausted (no disable webhook came).
+          {
+            status: SubscriptionStatus.PAST_DUE,
+            currentPeriodEnd: { lt: graceCutoff },
+          },
+          // Active but the renewal never confirmed within the grace window.
+          {
+            status: SubscriptionStatus.ACTIVE,
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: { lt: graceCutoff },
+          },
+        ],
+      },
+      select: { id: true, vendorId: true },
+    });
+    if (candidates.length === 0) return;
+
+    let expired = 0;
+    for (const sub of candidates) {
+      // Don't downgrade a vendor who has a newer active/trialing sub (e.g. they
+      // upgraded and this is the stale old one).
+      const other = await this.prisma.vendorSubscription.findFirst({
+        where: {
+          vendorId: sub.vendorId,
+          id: { not: sub.id },
+          status: {
+            in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING],
+          },
+        },
+        select: { id: true },
+      });
+      await this.prisma.$transaction([
+        this.prisma.vendorSubscription.update({
+          where: { id: sub.id },
+          data: { status: SubscriptionStatus.EXPIRED, cancelledAt: now },
+        }),
+        ...(other
+          ? []
+          : [
+              this.prisma.vendorProfile.update({
+                where: { id: sub.vendorId },
+                data: { subscriptionTier: SubscriptionTier.BASIC },
+              }),
+            ]),
+      ]);
+      expired++;
+    }
+    this.logger.log(`Expired ${expired} lapsed subscription(s).`);
+  }
 
   // ─── Currency: plans are stored in NGN (Paystack). For Stripe (USD merchant)
   //     we recalculate to USD at NGN_TO_USD_RATE so prices display/charge in $.
@@ -137,13 +222,81 @@ export class SubscriptionsService {
       },
     });
 
-    if (!subscription) throw new NotFoundException('No active subscription found');
+    // No paid/trial sub → the vendor is on the free BASIC floor. Self-heal by
+    // lazily creating a BASIC subscription so /me always returns a real plan
+    // (previously this 404'd for freshly-onboarded vendors).
+    if (!subscription) {
+      const basic = await this.ensureBasicSubscription(vendor.id);
+      return {
+        ...basic,
+        plan: basic.plan ? this.withBillingCurrency(basic.plan) : basic.plan,
+      };
+    }
     return {
       ...subscription,
       plan: subscription.plan
         ? this.withBillingCurrency(subscription.plan)
         : subscription.plan,
     };
+  }
+
+  /**
+   * Ensure the vendor has a BASIC subscription row (the free floor) and return
+   * it in the same shape as getMySubscription. Idempotent.
+   */
+  private async ensureBasicSubscription(vendorId: string) {
+    const select = {
+      id: true,
+      status: true,
+      billingCycle: true,
+      currentPeriodStart: true,
+      currentPeriodEnd: true,
+      trialEndsAt: true,
+      cancelAtPeriodEnd: true,
+      provider: true,
+      cancelledAt: true,
+      createdAt: true,
+      plan: { select: PLAN_PUBLIC_SELECT },
+    } as const;
+
+    const existing = await this.prisma.vendorSubscription.findFirst({
+      where: {
+        vendorId,
+        status: SubscriptionStatus.ACTIVE,
+        plan: { tier: SubscriptionTier.BASIC },
+      },
+      orderBy: { createdAt: 'desc' },
+      select,
+    });
+    if (existing) return existing;
+
+    const basicPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { tier: SubscriptionTier.BASIC },
+      select: { id: true },
+    });
+    if (!basicPlan) {
+      throw new NotFoundException('BASIC plan is not configured');
+    }
+
+    const now = new Date();
+    const [created] = await this.prisma.$transaction([
+      this.prisma.vendorSubscription.create({
+        data: {
+          vendorId,
+          planId: basicPlan.id,
+          status: SubscriptionStatus.ACTIVE,
+          billingCycle: BillingCycle.MONTHLY,
+          currentPeriodStart: now,
+          currentPeriodEnd: addMonths(now, 1),
+        },
+        select,
+      }),
+      this.prisma.vendorProfile.update({
+        where: { id: vendorId },
+        data: { subscriptionTier: SubscriptionTier.BASIC },
+      }),
+    ]);
+    return created;
   }
 
   // ─── Vendor: subscribe to a plan ──────────────────────────────────────────
@@ -220,23 +373,115 @@ export class SubscriptionsService {
       return { status: 'active', tier: plan.tier };
     }
 
-    // Paid (Premium/Gold): charge FIRST. We create a PENDING subscription
-    // (PAST_DUE — invisible to /me) and hand off to the provider. The vendor's
-    // plan does NOT change and the current plan stays active until the payment
-    // is verified (POST /subscriptions/verify), which then activates this one
-    // and cancels the old one.
+    // Paid (Premium/Gold).
     const pricing = this.priceInBillingCurrency(
       Number(plan.priceMonthly),
       Number(plan.priceYearly),
     );
-    const price =
+    const newPrice =
       billingCycle === BillingCycle.YEARLY
         ? pricing.priceYearly
         : pricing.priceMonthly;
-    const amountMinor = Math.round(price * 100);
     const periodEnd =
       billingCycle === BillingCycle.YEARLY ? addMonths(now, 12) : addMonths(now, 1);
 
+    // ── First paid subscription → 45-day free trial. The vendor gets the paid
+    //    tier now and is not charged; TrialClaim (vendor / device / phone)
+    //    prevents farming the trial across accounts. At trial end the nightly
+    //    sweeper drops them to BASIC unless they've subscribed (paid).
+    //    NOTE: charging a card up-front to auto-convert at trial end needs a
+    //    provider card-authorization flow (Paystack) — tracked separately; the
+    //    trialDays signal is already plumbed through the billing interface.
+    if (await this.isTrialEligible(vendor.id, user.phone, deviceId)) {
+      const trialEndsAt = addDays(now, TRIAL_DAYS);
+      const ops: Prisma.PrismaPromise<unknown>[] = [];
+      if (active) {
+        ops.push(
+          this.prisma.vendorSubscription.update({
+            where: { id: active.id },
+            data: {
+              status: SubscriptionStatus.CANCELLED,
+              cancelAtPeriodEnd: false,
+              cancelledAt: now,
+            },
+          }),
+        );
+      }
+      ops.push(
+        this.prisma.vendorSubscription.create({
+          data: {
+            vendorId: vendor.id,
+            planId: plan.id,
+            status: SubscriptionStatus.TRIALING,
+            billingCycle,
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+            trialEndsAt,
+          },
+        }),
+        this.prisma.vendorProfile.update({
+          where: { id: vendor.id },
+          data: { subscriptionTier: plan.tier },
+        }),
+        this.prisma.trialClaim.create({
+          data: {
+            vendorId: vendor.id,
+            deviceId: deviceId ?? null,
+            phone: user.phone ?? null,
+          },
+        }),
+      );
+      await this.prisma.$transaction(ops);
+      return { status: 'trialing', tier: plan.tier, trialEndsAt };
+    }
+
+    // ── Upgrade / downgrade with proration: credit the unused value of the
+    //    vendor's current paid tier against the new tier's price so they only
+    //    pay the difference (Paystack recurring doesn't prorate natively, so
+    //    this is applied as a one-time difference charge).
+    const credit = await this.proratedCredit(vendor.id, now);
+    const chargeAmount = Math.max(0, Math.round((newPrice - credit) * 100) / 100);
+    const amountMinor = Math.round(chargeAmount * 100);
+
+    // Fully covered by the credit (e.g. downgrade to a cheaper paid tier) →
+    // switch immediately, no checkout. The forfeited excess is not refunded.
+    if (amountMinor === 0) {
+      const ops: Prisma.PrismaPromise<unknown>[] = [];
+      if (active) {
+        ops.push(
+          this.prisma.vendorSubscription.update({
+            where: { id: active.id },
+            data: {
+              status: SubscriptionStatus.CANCELLED,
+              cancelAtPeriodEnd: false,
+              cancelledAt: now,
+            },
+          }),
+        );
+      }
+      ops.push(
+        this.prisma.vendorSubscription.create({
+          data: {
+            vendorId: vendor.id,
+            planId: plan.id,
+            status: SubscriptionStatus.ACTIVE,
+            billingCycle,
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+          },
+        }),
+        this.prisma.vendorProfile.update({
+          where: { id: vendor.id },
+          data: { subscriptionTier: plan.tier },
+        }),
+      );
+      await this.prisma.$transaction(ops);
+      return { status: 'active', tier: plan.tier, prorationCredit: credit };
+    }
+
+    // Charge the prorated difference FIRST via a PENDING (PAST_DUE) subscription;
+    // the current plan stays active until POST /subscriptions/verify confirms
+    // the payment, which then activates this one and cancels the old.
     const result = await this.billing.createSubscription({
       vendorId: vendor.id,
       email: user.email,
@@ -247,7 +492,7 @@ export class SubscriptionsService {
       trialDays: 0,
       successUrl: dto.callbackUrl,
       cancelUrl: dto.callbackUrl,
-      metadata: { planId: plan.id, userId },
+      metadata: { planId: plan.id, userId, prorationCredit: credit },
     });
 
     await this.prisma.vendorSubscription.create({
@@ -268,7 +513,72 @@ export class SubscriptionsService {
       tier: plan.tier,
       checkoutUrl: result.checkoutUrl,
       reference: result.providerSubscriptionId,
+      prorationCredit: credit,
+      amountCharged: chargeAmount,
     };
+  }
+
+  /** First-paid-subscription check for trial eligibility, with anti-abuse. */
+  private async isTrialEligible(
+    vendorId: string,
+    phone?: string | null,
+    deviceId?: string | null,
+  ): Promise<boolean> {
+    const claim = await this.prisma.trialClaim.findFirst({
+      where: {
+        OR: [
+          { vendorId },
+          ...(deviceId ? [{ deviceId }] : []),
+          ...(phone ? [{ phone }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (claim) return false;
+    // Never had any paid (non-BASIC) subscription before.
+    const priorPaid = await this.prisma.vendorSubscription.findFirst({
+      where: { vendorId, plan: { tier: { not: SubscriptionTier.BASIC } } },
+      select: { id: true },
+    });
+    return !priorPaid;
+  }
+
+  /**
+   * Unused value of the vendor's current ACTIVE paid tier, in the active
+   * billing currency, as a proration credit toward an upgrade/downgrade.
+   * Returns 0 when the vendor is on BASIC or has no remaining period.
+   */
+  private async proratedCredit(vendorId: string, now: Date): Promise<number> {
+    const current = await this.prisma.vendorSubscription.findFirst({
+      where: {
+        vendorId,
+        status: SubscriptionStatus.ACTIVE,
+        plan: { tier: { not: SubscriptionTier.BASIC } },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        currentPeriodStart: true,
+        currentPeriodEnd: true,
+        billingCycle: true,
+        plan: { select: { priceMonthly: true, priceYearly: true } },
+      },
+    });
+    if (!current) return 0;
+
+    const periodMs =
+      current.currentPeriodEnd.getTime() - current.currentPeriodStart.getTime();
+    const remainingMs = current.currentPeriodEnd.getTime() - now.getTime();
+    if (periodMs <= 0 || remainingMs <= 0) return 0;
+    const fraction = Math.min(1, remainingMs / periodMs);
+
+    const ngnPeriodPrice =
+      current.billingCycle === BillingCycle.YEARLY
+        ? Number(current.plan.priceYearly)
+        : Number(current.plan.priceMonthly);
+    // Convert the NGN period price into the billing currency (pass as both args;
+    // priceMonthly of the result is the converted single value).
+    const converted = this.priceInBillingCurrency(ngnPeriodPrice, ngnPeriodPrice);
+    return Math.round(converted.priceMonthly * fraction * 100) / 100;
   }
 
   /**
