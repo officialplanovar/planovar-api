@@ -20,11 +20,17 @@ const prisma = new PrismaClient({ adapter });
  */
 export function normalizeNgPhone(raw?: string | null): string | null {
   if (!raw) return null;
-  let digits = raw.replace(/\D/g, ''); // keep digits only
-  if (digits.startsWith('234')) digits = digits.slice(3); // strip country code
-  digits = digits.replace(/^0+/, ''); // strip national trunk '0'
+  const hasPlus = raw.trim().startsWith('+');
+  const digits = raw.replace(/\D/g, ''); // keep digits only
   if (digits.length === 0) return null;
-  return `+234${digits}`;
+  // International number as entered (dial code included, e.g. +1, +44, +234):
+  // preserve it so non-Nigerian numbers aren't rewritten to +234. The apps
+  // always prepend the selected country's dial code.
+  if (hasPlus) return `+${digits}`;
+  // Bare number with no country code → treat as a local Nigerian number (the
+  // default region): strip a leading 234/trunk 0 and prefix +234.
+  const local = digits.replace(/^234/, '').replace(/^0+/, '');
+  return local.length === 0 ? null : `+234${local}`;
 }
 
 // ── Email OTP delivery (Resend, branded templates) ─────────────────────────
