@@ -14,8 +14,12 @@ import { auth } from '../../auth/auth.config';
 import { ChatRealtimeService } from '../../common/realtime/chat-realtime.service';
 import { MessagingService } from './messaging.service';
 import { MessageType } from '@prisma/client';
+import { getCorsOrigins } from '../../common/cors';
 
-@WebSocketGateway({ cors: { origin: '*' }, namespace: '/chat' })
+@WebSocketGateway({
+  cors: { origin: getCorsOrigins(), credentials: true },
+  namespace: '/chat',
+})
 export class MessagingGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
 {

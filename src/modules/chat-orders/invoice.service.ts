@@ -274,10 +274,16 @@ export class InvoiceService {
     if (result.status !== 'success') return { confirmed: false };
 
     const cardId = await this.prisma.$transaction(async (tx) => {
-      await tx.paymentMilestone.update({
-        where: { id: milestone.id },
+      // Atomically claim the milestone. The verify endpoint and the webhook can
+      // race here — both pass the PAID pre-check above before either commits. A
+      // conditional updateMany means only the first writer proceeds; a 0-count
+      // means another call already paid it, so we skip the duplicate card /
+      // notification / invoice roll-up.
+      const claimed = await tx.paymentMilestone.updateMany({
+        where: { id: milestone.id, status: { not: InstallmentStatus.PAID } },
         data: { status: InstallmentStatus.PAID, paidAt: new Date() },
       });
+      if (claimed.count === 0) return null;
 
       const paidCard = await this.cards.post(tx, {
         conversationId: milestone.invoice.conversationId,
@@ -308,6 +314,10 @@ export class InvoiceService {
       });
       return paidCard.id;
     });
+
+    // Another concurrent call already confirmed this milestone — idempotent
+    // success with no duplicate side effects.
+    if (cardId === null) return { confirmed: true };
 
     await this.cards.broadcast(cardId);
 

@@ -27,6 +27,18 @@ import { VerifyPaymentDto } from './dto/verify-payment.dto';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { InvoiceService } from '../chat-orders/invoice.service';
 
+/**
+ * Constant-time comparison of two hex/ascii signatures. Guards against timing
+ * attacks on webhook signature verification and never throws on length mismatch.
+ */
+function safeSignatureEqual(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -226,7 +238,7 @@ export class PaymentsService {
     const secret = this.config.get<string>('PAYSTACK_SECRET_KEY', '');
     const expectedSig = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
 
-    if (expectedSig !== signature) {
+    if (!safeSignatureEqual(expectedSig, signature)) {
       throw new UnauthorizedException('Invalid Paystack webhook signature');
     }
 
@@ -283,6 +295,25 @@ export class PaymentsService {
         return;
       }
 
+      // Amount/currency integrity — Paystack reports `amount` in kobo (minor
+      // units); our transaction stores NGN major units. Reject a charge that
+      // doesn't match the amount we expected (under-payment / wrong currency)
+      // even though Paystack marked it successful.
+      const paidMinor = Number(event.data.amount);
+      const expectedMinor = Math.round(Number(transaction.amount) * 100);
+      const paidCurrency = (event.data.currency as string | undefined) ?? transaction.currency;
+      if (
+        !Number.isFinite(paidMinor) ||
+        paidMinor < expectedMinor ||
+        paidCurrency !== transaction.currency
+      ) {
+        this.logger.error(
+          `Paystack webhook amount mismatch for reference ${reference}: ` +
+            `paid ${paidMinor} ${paidCurrency}, expected ${expectedMinor} ${transaction.currency} — not processing`,
+        );
+        return;
+      }
+
       await this.prisma.transaction.update({
         where: { id: transaction.id },
         data: { paystackStatus: 'success' },
@@ -301,11 +332,20 @@ export class PaymentsService {
   async handleFlutterwaveWebhook(rawBody: Buffer, signature: string) {
     const expectedHash = this.config.get<string>('FLUTTERWAVE_SECRET_HASH', '');
 
-    if (signature !== expectedHash) {
+    if (!safeSignatureEqual(expectedHash, signature)) {
       throw new UnauthorizedException('Invalid Flutterwave webhook signature');
     }
 
-    let event: { event: string; data: { tx_ref?: string; flw_ref?: string; status: string } };
+    let event: {
+      event: string;
+      data: {
+        tx_ref?: string;
+        flw_ref?: string;
+        status: string;
+        amount?: number;
+        currency?: string;
+      };
+    };
     try {
       event = JSON.parse(rawBody.toString('utf8'));
     } catch (err) {
@@ -334,6 +374,24 @@ export class PaymentsService {
       const meta = transaction.metadata as Record<string, unknown> | null;
       if (meta?.flwProcessed === true) {
         this.logger.log(`Flutterwave webhook: transaction ${transaction.id} already processed`);
+        return;
+      }
+
+      // Amount/currency integrity — Flutterwave reports `amount` in major units
+      // (same as our transaction). Reject an under-payment / wrong currency even
+      // if Flutterwave marked it successful.
+      const paidAmount = Number(event.data.amount);
+      const expectedAmount = Number(transaction.amount);
+      const paidCurrency = event.data.currency ?? transaction.currency;
+      if (
+        !Number.isFinite(paidAmount) ||
+        paidAmount + 1e-6 < expectedAmount ||
+        paidCurrency !== transaction.currency
+      ) {
+        this.logger.error(
+          `Flutterwave webhook amount mismatch for tx_ref ${txRef}: ` +
+            `paid ${paidAmount} ${paidCurrency}, expected ${expectedAmount} ${transaction.currency} — not processing`,
+        );
         return;
       }
 

@@ -31,6 +31,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
 import { TransactionsEnabledGuard } from '../../common/guards/transactions-enabled.guard';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
@@ -104,6 +105,7 @@ export class PaymentsController {
   // WEBHOOK ENDPOINTS — no auth guard, raw body required
   // ─────────────────────────────────────────────────────────────────────────
 
+  @SkipThrottle()
   @Post('webhook/paystack')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -119,6 +121,7 @@ export class PaymentsController {
     return { received: true };
   }
 
+  @SkipThrottle()
   @Post('webhook/flutterwave')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

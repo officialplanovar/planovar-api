@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 // Infrastructure (global — available to every feature module)
 import { PrismaModule } from './prisma/prisma.module';
@@ -45,6 +47,20 @@ import { SearchModule } from './modules/search/search.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
 
+    // ─── Rate limiting ────────────────────────────────────────────────────
+    // A general per-IP backstop across the whole API (payments, bank-resolve
+    // proxy, etc.). Auth/OTP endpoints have their own tighter per-path limits
+    // via Better Auth (see auth.config.ts). Webhooks are exempt (@SkipThrottle).
+    // Kept generous by default to tolerate carrier NAT (many users share one IP
+    // on Nigerian mobile networks); tune via THROTTLE_TTL_MS / THROTTLE_LIMIT.
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: Number(process.env.THROTTLE_TTL_MS ?? 60_000),
+        limit: Number(process.env.THROTTLE_LIMIT ?? 300),
+      },
+    ]),
+
     // ─── Infrastructure ───────────────────────────────────────────────────
     PrismaModule,
     ChatRealtimeModule,
@@ -81,6 +97,10 @@ import { SearchModule } from './modules/search/search.module';
     CallsModule,
     NotificationsModule,
     SearchModule,
+  ],
+  providers: [
+    // Apply the rate limiter globally.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

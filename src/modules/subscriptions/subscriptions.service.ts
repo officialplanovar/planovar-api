@@ -594,7 +594,39 @@ export class SubscriptionsService {
 
     const verified = await this.billing.verifyTransaction(reference);
 
-    // Find the pending sub for this checkout. With recurring billing the
+    // SECURITY: the presented reference must belong to THIS vendor's own
+    // subscription checkout. Without this, a vendor could unlock an expensive
+    // tier by presenting ANY unrelated successful Paystack reference (e.g. a
+    // trivial ₦50 charge). Two independent bindings, either of which is
+    // sufficient:
+    //  (a) the reference matches a subscription row we created for this vendor
+    //      (its providerSubscriptionId). Because that reference was initialized
+    //      with the exact prorated amount, a successful charge on it IS the
+    //      correct amount — Paystack won't accept a different amount for it.
+    //  (b) the verified transaction carries the subscription metadata we set at
+    //      initialize (type=subscription + this vendor's id). This covers the
+    //      recurring case where the `subscription.create` webhook has already
+    //      rewritten the stored reference to a SUB_xxx code.
+    const meta = (
+      verified.raw as
+        | { metadata?: { type?: string; vendorId?: string } }
+        | undefined
+    )?.metadata;
+    const metaMatchesVendor =
+      meta?.type === 'subscription' && meta?.vendorId === vendor.id;
+
+    const byReference = await this.prisma.vendorSubscription.findFirst({
+      where: { vendorId: vendor.id, providerSubscriptionId: reference },
+      select: { id: true },
+    });
+
+    if (!byReference && !metaMatchesVendor) {
+      throw new BadRequestException(
+        'Payment reference does not match a pending subscription for this account',
+      );
+    }
+
+    // The pending sub to activate. With recurring billing the
     // `subscription.create` webhook can land first — activating the sub and
     // replacing the reference with the Paystack subscription code — so match the
     // vendor's latest PAST_DUE sub rather than requiring a reference match.

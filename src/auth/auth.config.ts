@@ -93,7 +93,39 @@ export const auth = betterAuth({
   ],
 
   // ── Secret (used to sign sessions) ─────────────────────────────────────
-  secret: process.env.BETTER_AUTH_SECRET ?? 'change-me-in-production',
+  // SECURITY: never fall back to a hardcoded secret in production — a public
+  // signing secret lets anyone forge session tokens for any user (incl. ADMIN).
+  // Fail fast at boot if it isn't set; a fixed dev-only value keeps local dev
+  // frictionless.
+  secret: (() => {
+    const s = process.env.BETTER_AUTH_SECRET?.trim();
+    if (s) return s;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'BETTER_AUTH_SECRET is required in production (used to sign sessions). Set it and restart.',
+      );
+    }
+    return 'dev-only-insecure-secret-do-not-use-in-prod';
+  })(),
+
+  // ── Rate limiting (brute-force protection for auth/OTP) ─────────────────
+  // Better Auth's built-in, per-path limiter. Without this the 6-digit email
+  // OTP (10-min TTL) is brute-forceable. Values are per-IP; kept generous
+  // enough to tolerate carrier NAT while still bounding automated abuse.
+  // NOTE: per-account limiting is a stronger follow-up.
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 120,
+    customRules: {
+      '/sign-in/email': { window: 60, max: 20 },
+      '/sign-up/email': { window: 60, max: 10 },
+      '/email-otp/send-verification-otp': { window: 60, max: 5 },
+      '/email-otp/verify-email': { window: 60, max: 15 },
+      '/forget-password': { window: 60, max: 10 },
+      '/reset-password': { window: 60, max: 10 },
+    },
+  },
 
   // ── ID generation — always UUID so our FK columns stay @db.Uuid ────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -5,6 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { injectBetterAuthPaths } from './auth/better-auth.swagger';
+import { getCorsOrigins } from './common/cors';
 
 // Log stray async errors but DON'T exit — a single unhandled rejection (a Redis
 // blip, a fire-and-forget index/webhook call) must not take the whole API down.
@@ -54,20 +55,10 @@ async function bootstrap() {
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
   );
 
-  // CORS — Flutter web and admin console origins.
+  // CORS — Flutter web and admin console origins (shared with the WS gateway).
   // Extra origins can be supplied via CORS_ORIGINS (comma-separated).
-  const defaultOrigins = [
-    'http://localhost:3001', // Flutter client web (dev)
-    'http://localhost:3002', // Flutter vendor web (dev)
-    'http://localhost:3003', // Admin console (dev, default Next port)
-    'http://localhost:3004', // Admin console (dev, documented port)
-  ];
-  const envOrigins = (process.env.CORS_ORIGINS ?? '')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
   app.enableCors({
-    origin: [...new Set([...defaultOrigins, ...envOrigins])],
+    origin: getCorsOrigins(),
     credentials: true, // required for Better Auth session cookies
     // Expose the Better Auth bearer token so browser SPAs (admin console) can
     // read it from the response and store it for Authorization headers.
@@ -107,6 +98,11 @@ async function bootstrap() {
       },
     });
   }
+
+  // Drain in-flight requests and close DB/Redis connections on SIGTERM/SIGINT
+  // (Railway/Docker send SIGTERM on redeploy). Without this, PrismaService /
+  // RedisService onModuleDestroy never fires and connections leak on every deploy.
+  app.enableShutdownHooks();
 
   const port = process.env.PORT ?? 3000;
   // Bind to 0.0.0.0 (per Railway docs) — the default bind can leave the edge
