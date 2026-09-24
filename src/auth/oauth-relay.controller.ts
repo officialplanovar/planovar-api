@@ -29,8 +29,19 @@ const WEB_ORIGINS = new Set(
     .filter(Boolean),
 );
 
-// Custom URL schemes for the native apps' deep links.
-const MOBILE_SCHEMES = ['planovar://', 'planovarvendor://'];
+// Custom URL schemes for the native apps' deep links. One per app × flavor so
+// dev/staging/prod builds can be installed side by side without the OAuth
+// callback colliding (must match each app's OAUTH_SCHEME in config/<env>.json).
+const MOBILE_SCHEMES = [
+  // client
+  'planovar://',
+  'planovardev://',
+  'planovarstaging://',
+  // vendor
+  'planovarvendor://',
+  'planovarvendordev://',
+  'planovarvendorstaging://',
+];
 
 /** Guards against open redirects — only known app targets are allowed. */
 function isAllowedRedirect(redirect: string): boolean {
