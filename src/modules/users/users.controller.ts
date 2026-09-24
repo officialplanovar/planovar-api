@@ -49,6 +49,15 @@ export class UsersController {
     return this.usersService.deactivateMe((req as any).user.id);
   }
 
+  @Patch('me/notification-prefs')
+  @ApiOperation({ summary: 'Replace the signed-in user notification preferences' })
+  updateNotificationPrefs(
+    @Req() req: Request,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.usersService.updateNotificationPrefs((req as any).user.id, body);
+  }
+
   // ─── Device tokens ────────────────────────────────────────────────────────
 
   @Post('me/device-token')

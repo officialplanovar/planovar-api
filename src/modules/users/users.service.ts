@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DevicePlatform, FavouriteType } from '@prisma/client';
+import { DevicePlatform, FavouriteType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SetPreferencesDto } from './dto/set-preferences.dto';
@@ -29,6 +29,7 @@ export class UsersService {
         createdAt: true,
         isActive: true,
         deletedAt: true,
+        notificationPrefs: true,
         // Presence lets the apps enforce role separation (client vs vendor)
         // and resume onboarding at the right step.
         vendorProfile: {
@@ -67,6 +68,19 @@ export class UsersService {
       user.isActive = true;
     }
     return user;
+  }
+
+  /**
+   * Replace the user's notification preferences (a free-form JSON blob owned by
+   * the apps, e.g. { channel, messages, orders, payments, ... }).
+   */
+  async updateNotificationPrefs(userId: string, prefs: Record<string, unknown>) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { notificationPrefs: prefs as Prisma.InputJsonValue },
+      select: { notificationPrefs: true },
+    });
+    return user.notificationPrefs ?? {};
   }
 
   /**
