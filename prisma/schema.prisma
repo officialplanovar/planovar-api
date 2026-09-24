@@ -297,8 +297,9 @@ model User {
   // (PII scrubbed) but retained for financial/audit integrity. See UsersService.deleteMe.
   deletedAt         DateTime? @map("deleted_at")
 
-  sessions Session[]
-  accounts Account[]
+  sessions   Session[]
+  accounts   Account[]
+  twoFactors TwoFactor[]
 
   // Application relations
   vendorProfile            VendorProfile?
@@ -331,6 +332,21 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
+}
+
+// Better Auth twoFactor plugin — TOTP secret + backup codes per user.
+model TwoFactor {
+  id          String  @id // Better Auth-generated
+  secret      String
+  backupCodes String  @map("backup_codes")
+  userId      String  @map("user_id")
+  verified    Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([secret])
+  @@index([userId])
+  @@map("two_factor")
 }
 
 model Account {

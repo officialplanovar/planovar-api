@@ -2,7 +2,7 @@ import 'dotenv/config'; // must load before anything reads process.env
 import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { bearer, emailOTP } from 'better-auth/plugins';
+import { bearer, emailOTP, twoFactor } from 'better-auth/plugins';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Resend } from 'resend';
@@ -151,6 +151,11 @@ export const auth = betterAuth({
     // (token stored in flutter_secure_storage) instead of cookies. The token is
     // returned in the `set-auth-token` response header on sign-in/sign-up.
     bearer(),
+    // TOTP-based two-factor auth (authenticator apps). Requires the TwoFactor
+    // table (see prisma/schema.prisma) + user.twoFactorEnabled. When a user with
+    // 2FA enabled signs in, Better Auth returns { twoFactorRedirect: true } and
+    // the client must complete /two-factor/verify-totp.
+    twoFactor({ issuer: 'Planovar' }),
     emailOTP({
       otpLength: 6,
       expiresIn: 600, // 10 minutes
