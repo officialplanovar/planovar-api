@@ -33,6 +33,22 @@ export class UsersController {
     return this.usersService.setPreferences((req as any).user.id, dto);
   }
 
+  @Delete('me')
+  @ApiOperation({
+    summary: 'Delete the signed-in account (anonymizes PII, revokes sessions)',
+  })
+  deleteMe(@Req() req: Request) {
+    return this.usersService.deleteMe((req as any).user.id);
+  }
+
+  @Post('me/deactivate')
+  @ApiOperation({
+    summary: 'Deactivate (reversible pause) the signed-in account + sign out',
+  })
+  deactivateMe(@Req() req: Request) {
+    return this.usersService.deactivateMe((req as any).user.id);
+  }
+
   // ─── Device tokens ────────────────────────────────────────────────────────
 
   @Post('me/device-token')

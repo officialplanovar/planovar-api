@@ -27,6 +27,8 @@ export class UsersService {
         firstName: true,
         lastName: true,
         createdAt: true,
+        isActive: true,
+        deletedAt: true,
         // Presence lets the apps enforce role separation (client vs vendor)
         // and resume onboarding at the right step.
         vendorProfile: {
@@ -55,7 +57,31 @@ export class UsersService {
     });
 
     if (!user) throw new NotFoundException('User not found');
+    // Auto-reactivate a deactivated (but not deleted) account on return — the
+    // pause ends when the user signs back in.
+    if (!user.isActive && user.deletedAt == null) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { isActive: true },
+      });
+      user.isActive = true;
+    }
     return user;
+  }
+
+  /**
+   * Reversible account pause: deactivate and sign the user out everywhere. The
+   * account is reactivated automatically the next time they sign in (getMe).
+   */
+  async deactivateMe(userId: string) {
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { isActive: false },
+      }),
+      this.prisma.session.deleteMany({ where: { userId } }),
+    ]);
+    return { deactivated: true };
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {
@@ -88,6 +114,47 @@ export class UsersService {
     });
 
     return this.getMe(userId);
+  }
+
+  /**
+   * NDPA-compliant account deletion: anonymize the user's personal data and
+   * deactivate the account, but retain (now-anonymized) transactional records
+   * (bookings, payments, payouts) for financial and audit integrity. All
+   * sessions are revoked so any active token is invalidated immediately.
+   */
+  async deleteMe(userId: string) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          name: 'Deleted User',
+          email: `deleted+${userId}@deleted.planovar`,
+          phone: null,
+          image: null,
+          firstName: null,
+          lastName: null,
+          dateOfBirth: null,
+          isActive: false,
+          deletedAt: new Date(),
+        },
+      });
+      // Scrub vendor-profile PII if this was a vendor account.
+      await tx.vendorProfile.updateMany({
+        where: { userId },
+        data: {
+          businessName: 'Deleted Vendor',
+          description: null,
+          logoUrl: null,
+          coverUrl: null,
+          portfolioUrls: [],
+          phone: null,
+          email: null,
+        },
+      });
+      // Revoke all sessions — the account is now signed out everywhere.
+      await tx.session.deleteMany({ where: { userId } });
+    });
+    return { deleted: true };
   }
 
   async setPreferences(userId: string, dto: SetPreferencesDto) {
