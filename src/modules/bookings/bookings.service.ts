@@ -178,6 +178,13 @@ export class BookingsService {
             installments: { orderBy: { sortOrder: 'asc' } },
           },
         },
+        // Fee breakdown (line items) + payment schedule/history (milestones).
+        invoice: {
+          include: {
+            lineItems: { orderBy: { sortOrder: 'asc' } },
+            milestones: { orderBy: { sortOrder: 'asc' } },
+          },
+        },
       },
     });
     if (!booking) throw new NotFoundException('Booking not found');
