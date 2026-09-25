@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   KycStatus,
   Prisma,
@@ -342,5 +347,70 @@ export class AdminService {
         Object.entries(byTier).map(([k, v]) => [k, { count: v.count, mrr: round2(v.mrr) }]),
       ),
     };
+  }
+
+  // ─── Platform settings (singleton row) ──────────────────────────────────────
+  async getSettings() {
+    return this.prisma.platformSettings.upsert({
+      where: { id: 'singleton' },
+      create: {},
+      update: {},
+    });
+  }
+
+  async updateSettings(dto: {
+    platformName?: string;
+    supportEmail?: string;
+    currency?: string;
+    region?: string;
+    maintenanceMode?: boolean;
+  }) {
+    return this.prisma.platformSettings.upsert({
+      where: { id: 'singleton' },
+      create: { ...dto },
+      update: { ...dto },
+    });
+  }
+
+  // ─── Admin team management (uses the existing ADMIN role) ────────────────────
+  async listAdmins() {
+    return this.prisma.user.findMany({
+      where: { role: UserRole.ADMIN, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /// Promote an existing user to ADMIN by email.
+  async promoteToAdmin(email: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' }, deletedAt: null },
+    });
+    if (!user) throw new NotFoundException('No user found with that email');
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { role: UserRole.ADMIN },
+    });
+    return this.listAdmins();
+  }
+
+  /// Change a user's role (e.g. demote an admin back to CLIENT).
+  async setUserRole(userId: string, role: string) {
+    const valid = Object.values(UserRole) as string[];
+    if (!valid.includes(role)) throw new BadRequestException('Invalid role');
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: role as UserRole },
+    });
+    return { id: userId, role };
   }
 }

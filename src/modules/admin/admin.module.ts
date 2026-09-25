@@ -5,6 +5,8 @@ import { AdminDashboardController } from './admin-dashboard.controller';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminSubscriptionsController } from './admin-subscriptions.controller';
 import { AdminAuditController } from './admin-audit.controller';
+import { AdminSettingsController } from './admin-settings.controller';
+import { AdminTeamController } from './admin-team.controller';
 import { AdminService } from './admin.service';
 import { CategoriesModule } from '../categories/categories.module';
 import { VendorsModule } from '../vendors/vendors.module';
@@ -18,6 +20,8 @@ import { VendorsModule } from '../vendors/vendors.module';
     AdminUsersController,
     AdminSubscriptionsController,
     AdminAuditController,
+    AdminSettingsController,
+    AdminTeamController,
   ],
   providers: [AdminService],
 })

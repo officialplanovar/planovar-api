@@ -349,6 +349,19 @@ model TwoFactor {
   @@map("two_factor")
 }
 
+// Global platform configuration — a single row (id = "singleton").
+model PlatformSettings {
+  id              String   @id @default("singleton")
+  platformName    String   @default("Planovar") @map("platform_name")
+  supportEmail    String   @default("support@planovar.com") @map("support_email")
+  currency        String   @default("NGN")
+  region          String   @default("Nigeria")
+  maintenanceMode Boolean  @default(false) @map("maintenance_mode")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
 model Account {
   id                    String    @id // Better Auth-generated
   accountId             String
