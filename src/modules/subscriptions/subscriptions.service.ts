@@ -152,20 +152,15 @@ export class SubscriptionsService {
     this.logger.log(`Expired ${expired} lapsed subscription(s).`);
   }
 
-  // ─── Currency: plans are stored in NGN (Paystack). For Stripe (USD merchant)
-  //     we recalculate to USD at NGN_TO_USD_RATE so prices display/charge in $.
-  private get billingCurrency(): 'NGN' | 'USD' {
-    const provider = String(process.env.PAYMENT_PROVIDER ?? 'paystack').toLowerCase();
-    return provider === 'stripe' ? 'USD' : 'NGN';
+  // ─── Currency: plans are stored USD-native. Prices are served and charged in
+  //     the stored currency as-is (no FX conversion). Kept as helpers so call
+  //     sites and the plan-cache key stay stable if multi-currency is added.
+  private get billingCurrency(): 'USD' {
+    return 'USD';
   }
 
-  private priceInBillingCurrency(ngnMonthly: number, ngnYearly: number) {
-    if (this.billingCurrency === 'USD') {
-      const rate = Number(process.env.NGN_TO_USD_RATE) || 1600; // 1 USD ≈ ₦1600
-      const usd = (n: number) => Math.round((n / rate) * 100) / 100;
-      return { currency: 'USD', priceMonthly: usd(ngnMonthly), priceYearly: usd(ngnYearly) };
-    }
-    return { currency: 'NGN', priceMonthly: ngnMonthly, priceYearly: ngnYearly };
+  private priceInBillingCurrency(monthly: number, yearly: number) {
+    return { currency: this.billingCurrency, priceMonthly: monthly, priceYearly: yearly };
   }
 
   /** Re-express a plan object's price/currency in the active billing currency. */

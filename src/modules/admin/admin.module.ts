@@ -7,6 +7,7 @@ import { AdminSubscriptionsController } from './admin-subscriptions.controller';
 import { AdminAuditController } from './admin-audit.controller';
 import { AdminSettingsController } from './admin-settings.controller';
 import { AdminTeamController } from './admin-team.controller';
+import { AdminPlansController } from './admin-plans.controller';
 import { AdminService } from './admin.service';
 import { CategoriesModule } from '../categories/categories.module';
 import { VendorsModule } from '../vendors/vendors.module';
@@ -22,6 +23,7 @@ import { VendorsModule } from '../vendors/vendors.module';
     AdminAuditController,
     AdminSettingsController,
     AdminTeamController,
+    AdminPlansController,
   ],
   providers: [AdminService],
 })

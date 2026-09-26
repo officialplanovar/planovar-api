@@ -372,6 +372,65 @@ export class AdminService {
     });
   }
 
+  // ─── Subscription plans (admin-configurable pricing) ─────────────────────────
+  private static readonly PLAN_SELECT = {
+    tier: true,
+    name: true,
+    priceMonthly: true,
+    priceYearly: true,
+    currency: true,
+    listingLimit: true,
+    features: true,
+  } as const;
+
+  /** List every plan with its raw stored pricing (no currency conversion). */
+  async getPlans() {
+    return this.prisma.subscriptionPlan.findMany({
+      orderBy: { priceMonthly: 'asc' },
+      select: AdminService.PLAN_SELECT,
+    });
+  }
+
+  /** Update a plan by tier. Only supplied fields change. */
+  async updatePlan(
+    tier: string,
+    dto: {
+      name?: string;
+      priceMonthly?: number;
+      priceYearly?: number;
+      currency?: string;
+      listingLimit?: number | null;
+      features?: string[];
+    },
+  ) {
+    const validTiers = Object.values(SubscriptionTier) as string[];
+    if (!validTiers.includes(tier)) {
+      throw new BadRequestException(
+        `Invalid tier. Expected one of: ${validTiers.join(', ')}`,
+      );
+    }
+
+    const existing = await this.prisma.subscriptionPlan.findUnique({
+      where: { tier: tier as SubscriptionTier },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Subscription plan not found');
+
+    const data: Prisma.SubscriptionPlanUpdateInput = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.priceMonthly !== undefined) data.priceMonthly = dto.priceMonthly;
+    if (dto.priceYearly !== undefined) data.priceYearly = dto.priceYearly;
+    if (dto.currency !== undefined) data.currency = dto.currency;
+    if (dto.listingLimit !== undefined) data.listingLimit = dto.listingLimit;
+    if (dto.features !== undefined) data.features = dto.features;
+
+    return this.prisma.subscriptionPlan.update({
+      where: { tier: tier as SubscriptionTier },
+      data,
+      select: AdminService.PLAN_SELECT,
+    });
+  }
+
   // ─── Admin team management (uses the existing ADMIN role) ────────────────────
   async listAdmins() {
     return this.prisma.user.findMany({

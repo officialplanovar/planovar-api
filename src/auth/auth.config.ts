@@ -13,24 +13,27 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 /**
- * Normalize a Nigerian MSISDN to canonical E.164 (`+234XXXXXXXXXX`).
- * Collapses the equivalent inputs `08132665650`, `8132665650`, `2348132665650`
- * and the mistyped `+23408132665650` to one value, so the `phone @unique`
- * anti-dup constraint can't be sidestepped by formatting. Empty → null.
+ * Normalize a phone number to canonical E.164 for the global platform.
+ * Planovar is worldwide, so a number is NOT assumed to be Nigerian: any number
+ * that includes a country code (leading `+`) is preserved as `+<digits>`, and a
+ * bare number with no dial code is only minimally normalized to its digits —
+ * we do NOT inject a `+234` (or any) country code. The apps always prepend the
+ * selected country's dial code, so submitted numbers should already carry `+`.
+ * Preserving one canonical form still keeps the `phone @unique` anti-dup
+ * constraint from being sidestepped by formatting. Empty → null.
  */
-export function normalizeNgPhone(raw?: string | null): string | null {
+export function normalizePhone(raw?: string | null): string | null {
   if (!raw) return null;
   const hasPlus = raw.trim().startsWith('+');
   const digits = raw.replace(/\D/g, ''); // keep digits only
   if (digits.length === 0) return null;
   // International number as entered (dial code included, e.g. +1, +44, +234):
-  // preserve it so non-Nigerian numbers aren't rewritten to +234. The apps
-  // always prepend the selected country's dial code.
+  // preserve it in canonical E.164 form.
   if (hasPlus) return `+${digits}`;
-  // Bare number with no country code → treat as a local Nigerian number (the
-  // default region): strip a leading 234/trunk 0 and prefix +234.
-  const local = digits.replace(/^234/, '').replace(/^0+/, '');
-  return local.length === 0 ? null : `+234${local}`;
+  // Bare number with no country code → cannot assume a region on a global
+  // platform. Return the digits as entered (minimal normalization); do not
+  // prefix any dial code.
+  return digits;
 }
 
 // ── Email OTP delivery (Resend, branded templates) ─────────────────────────
@@ -215,7 +218,7 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          const phone = normalizeNgPhone(
+          const phone = normalizePhone(
             (user as { phone?: string | null }).phone,
           );
           if (phone) {

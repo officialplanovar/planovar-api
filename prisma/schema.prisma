@@ -307,7 +307,7 @@ model PlatformSettings {
   id              String   @id @default("singleton")
   platformName    String   @default("Planovar") @map("platform_name")
   supportEmail    String   @default("support@planovar.com") @map("support_email")
-  currency        String   @default("NGN")
+  currency        String   @default("USD")
   region          String   @default("Nigeria")
   maintenanceMode Boolean  @default(false) @map("maintenance_mode")
   updatedAt       DateTime @updatedAt @map("updated_at")
