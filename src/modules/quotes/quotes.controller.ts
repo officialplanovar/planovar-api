@@ -36,7 +36,7 @@ export class QuotesController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get quote details with line items and installments' })
+  @ApiOperation({ summary: 'Get quote details with line items' })
   @ApiParam({ name: 'id', description: 'Quote UUID' })
   findOne(@Req() req: Request, @Param('id') id: string) {
     return this.quotesService.findOne(id, (req as any).user.id);

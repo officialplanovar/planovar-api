@@ -35,7 +35,6 @@ export class ChatCardService {
           invoice: {
             include: {
               lineItems: { orderBy: { sortOrder: 'asc' } },
-              milestones: { orderBy: { sortOrder: 'asc' } },
             },
           },
           booking: {

@@ -78,21 +78,10 @@ export class QuoteFlowService {
     return created.id;
   }
 
-  private validateTerms(terms?: { percentage: number }[]) {
-    if (!terms?.length) return;
-    const sum = terms.reduce((acc, t) => acc + t.percentage, 0);
-    if (Math.round(sum) !== 100) {
-      throw new BadRequestException(
-        `Payment term percentages must sum to 100 (got ${sum})`,
-      );
-    }
-  }
-
   // ── Send (v1) ─────────────────────────────────────────────────────────────
 
   async sendQuote(vendorUserId: string, dto: SendQuoteDto) {
     const vendor = await this.vendorFor(vendorUserId);
-    this.validateTerms(dto.paymentTerms);
 
     const conversationId = await this.getOrCreateDirect(dto.clientId, vendor);
     const total = dto.lineItems.reduce((s, li) => s + li.amount, 0);
@@ -112,9 +101,7 @@ export class QuoteFlowService {
           amount: new Prisma.Decimal(total),
           description: dto.description ?? null,
           notes: dto.notes ?? null,
-          paymentTerms: dto.paymentTerms
-            ? (dto.paymentTerms as unknown as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
+          paymentTerms: dto.paymentTerms ?? null,
           validUntil,
           status: QuoteStatus.PENDING,
           version: 1,
@@ -174,7 +161,6 @@ export class QuoteFlowService {
     if (!current.conversationId || !current.clientId) {
       throw new BadRequestException('Quote is not attached to a conversation');
     }
-    this.validateTerms(dto.paymentTerms);
 
     const total = dto.lineItems.reduce((s, li) => s + li.amount, 0);
     const validUntil = dto.validUntil
@@ -198,9 +184,7 @@ export class QuoteFlowService {
           amount: new Prisma.Decimal(total),
           description: dto.description ?? current.description,
           notes: dto.notes ?? null,
-          paymentTerms: dto.paymentTerms
-            ? (dto.paymentTerms as unknown as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
+          paymentTerms: dto.paymentTerms ?? null,
           validUntil,
           status: QuoteStatus.PENDING,
           version: current.version + 1,

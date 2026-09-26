@@ -29,24 +29,6 @@ export class CreateOrderRequestDto {
   @Min(0)
   amount: number;
 
-  @ApiPropertyOptional({ example: 5000 })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  deliveryFee?: number;
-
-  @ApiPropertyOptional({ example: 20000, description: 'Rental refundable deposit' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  depositAmount?: number;
-
-  @ApiPropertyOptional({ example: 8000, description: 'Rental late fee per day' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  lateFeePerDay?: number;
-
   @ApiPropertyOptional({ description: 'Rental pickup date/time (ISO)' })
   @IsOptional()
   @IsDateString()

@@ -85,9 +85,7 @@ export class OrderRequestService {
     });
     if (!listing) throw new NotFoundException('Listing not found');
 
-    const delivery = dto.deliveryFee ?? 0;
-    const deposit = dto.depositAmount ?? 0;
-    const total = dto.amount + delivery + deposit;
+    const total = dto.amount;
 
     const conversationId = await this.getOrCreateDirect(
       clientUserId,
@@ -105,12 +103,6 @@ export class OrderRequestService {
           status: BookingStatus.PENDING,
           fulfilmentType: dto.fulfilmentType,
           deliveryMethod: dto.deliveryMethod,
-          deliveryFee: delivery ? new Prisma.Decimal(delivery) : null,
-          depositAmount: deposit ? new Prisma.Decimal(deposit) : null,
-          lateFeePerDay:
-            dto.lateFeePerDay != null
-              ? new Prisma.Decimal(dto.lateFeePerDay)
-              : null,
           pickupAt: dto.pickupAt ? new Date(dto.pickupAt) : null,
           returnAt: dto.returnAt ? new Date(dto.returnAt) : null,
           eventDate: dto.pickupAt ? new Date(dto.pickupAt) : new Date(),
@@ -222,15 +214,6 @@ export class OrderRequestService {
     const lineItems: { label: string; amount: number }[] = [
       { label: booking.listing.title, amount: booking.quoteAmount?.toNumber() ?? 0 },
     ];
-    if (booking.deliveryFee && booking.deliveryFee.toNumber() > 0) {
-      lineItems.push({ label: 'Delivery', amount: booking.deliveryFee.toNumber() });
-    }
-    if (booking.depositAmount && booking.depositAmount.toNumber() > 0) {
-      lineItems.push({
-        label: 'Refundable deposit',
-        amount: booking.depositAmount.toNumber(),
-      });
-    }
 
     const { invoice, cardIds } = await this.prisma.$transaction(async (tx) => {
       await tx.booking.update({

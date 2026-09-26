@@ -175,14 +175,12 @@ export class BookingsService {
         quotes: {
           include: {
             lineItems: { orderBy: { sortOrder: 'asc' } },
-            installments: { orderBy: { sortOrder: 'asc' } },
           },
         },
-        // Fee breakdown (line items) + payment schedule/history (milestones).
+        // Display-only invoice with its line items.
         invoice: {
           include: {
             lineItems: { orderBy: { sortOrder: 'asc' } },
-            milestones: { orderBy: { sortOrder: 'asc' } },
           },
         },
       },

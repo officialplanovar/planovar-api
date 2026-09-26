@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -8,10 +7,8 @@ import {
 } from '@nestjs/common';
 import {
   BookingStatus,
-  InstallmentStatus,
   NotificationType,
   Prisma,
-  QuotePaymentStructure,
   QuoteStatus,
   UserRole,
 } from '@prisma/client';
@@ -76,30 +73,15 @@ export class QuotesService {
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.vendorId !== vendor.id) throw new ForbiddenException('Booking does not belong to your vendor account');
 
-    const needsInstallments =
-      dto.paymentStructure === QuotePaymentStructure.INSTALLMENTS ||
-      dto.paymentStructure === QuotePaymentStructure.CUSTOM_ESCROW;
-
-    if (needsInstallments && (!dto.installments || dto.installments.length === 0)) {
-      throw new BadRequestException('Installments are required for INSTALLMENTS and CUSTOM_ESCROW payment structures');
-    }
-
-    if (dto.installments && dto.installments.length > 0) {
-      const sum = dto.installments.reduce((acc, i) => acc + i.percentage, 0);
-      if (Math.round(sum) !== 100) {
-        throw new BadRequestException(`Installment percentages must sum to 100 (got ${sum})`);
-      }
-    }
-
     const quote = await this.prisma.$transaction(async (tx) => {
       const created = await tx.quote.create({
         data: {
           bookingId: dto.bookingId,
           vendorId: vendor.id,
           status: QuoteStatus.PENDING,
-          paymentStructure: dto.paymentStructure,
           amount: new Prisma.Decimal(dto.totalAmount),
-          escrowPercentage: dto.escrowPercentage != null ? new Prisma.Decimal(dto.escrowPercentage) : undefined,
+          // Free-text payment terms — vendor-written, not enforced by the platform.
+          paymentTerms: dto.paymentTerms ?? null,
           validUntil: new Date(dto.validUntil),
           notes: dto.notes,
           description: dto.description,
@@ -115,21 +97,6 @@ export class QuotesService {
           sortOrder: item.sortOrder ?? index,
         })),
       });
-
-      if (dto.installments && dto.installments.length > 0) {
-        await tx.paymentInstallment.createMany({
-          data: dto.installments.map((inst, index) => ({
-            quoteId: created.id,
-            label: inst.label,
-            type: inst.type,
-            percentage: new Prisma.Decimal(inst.percentage),
-            amount: new Prisma.Decimal((inst.percentage / 100) * dto.totalAmount),
-            dueAt: new Date(inst.dueAt),
-            status: InstallmentStatus.PENDING,
-            sortOrder: inst.sortOrder ?? index,
-          })),
-        });
-      }
 
       return created;
     });
@@ -182,7 +149,6 @@ export class QuotesService {
       where: { id },
       include: {
         lineItems: { orderBy: { sortOrder: 'asc' } },
-        installments: { orderBy: { sortOrder: 'asc' } },
         booking: {
           select: {
             id: true,
@@ -207,15 +173,6 @@ export class QuotesService {
     const { quote } = await this.assertVendorOwns(id, userId);
     if (quote.isLocked) throw new ConflictException('Quote is locked and cannot be updated');
 
-    if (dto.installments && dto.installments.length > 0) {
-      const sum = dto.installments.reduce((acc, i) => acc + i.percentage, 0);
-      if (Math.round(sum) !== 100) {
-        throw new BadRequestException(`Installment percentages must sum to 100 (got ${sum})`);
-      }
-    }
-
-    const totalAmount = dto.totalAmount ?? quote.amount.toNumber();
-
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.quote.update({
         where: { id },
@@ -223,8 +180,7 @@ export class QuotesService {
           notes: dto.notes,
           description: dto.description,
           validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
-          paymentStructure: dto.paymentStructure,
-          escrowPercentage: dto.escrowPercentage != null ? new Prisma.Decimal(dto.escrowPercentage) : undefined,
+          paymentTerms: dto.paymentTerms ?? undefined,
           amount: dto.totalAmount != null ? new Prisma.Decimal(dto.totalAmount) : undefined,
         },
       });
@@ -239,24 +195,6 @@ export class QuotesService {
             sortOrder: item.sortOrder ?? index,
           })),
         });
-      }
-
-      if (dto.installments) {
-        await tx.paymentInstallment.deleteMany({ where: { quoteId: id } });
-        if (dto.installments.length > 0) {
-          await tx.paymentInstallment.createMany({
-            data: dto.installments.map((inst, index) => ({
-              quoteId: id,
-              label: inst.label,
-              type: inst.type,
-              percentage: new Prisma.Decimal(inst.percentage),
-              amount: new Prisma.Decimal((inst.percentage / 100) * totalAmount),
-              dueAt: new Date(inst.dueAt),
-              status: InstallmentStatus.PENDING,
-              sortOrder: inst.sortOrder ?? index,
-            })),
-          });
-        }
       }
 
       return updated;

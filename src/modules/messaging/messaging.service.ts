@@ -328,12 +328,11 @@ export class MessagingService {
         sender: { select: { id: true, name: true, image: true } },
         attachments: true,
         // Structured-card payloads so the client can render quote/invoice/
-        // milestone/order/to-do cards inline.
+        // order/to-do cards inline.
         quote: { include: { lineItems: { orderBy: { sortOrder: 'asc' } } } },
         invoice: {
           include: {
             lineItems: { orderBy: { sortOrder: 'asc' } },
-            milestones: { orderBy: { sortOrder: 'asc' } },
           },
         },
         booking: {

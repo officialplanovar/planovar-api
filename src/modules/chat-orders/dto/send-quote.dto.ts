@@ -9,7 +9,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -23,28 +22,6 @@ export class QuoteLineItemDto {
   @IsNumber()
   @Min(0)
   amount: number;
-}
-
-export class QuotePaymentTermDto {
-  @ApiProperty({ example: 'On Confirmation' })
-  @IsString()
-  label: string;
-
-  @ApiProperty({ example: 50, description: '% of the total (all terms sum to 100)' })
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  percentage: number;
-
-  @ApiPropertyOptional({ example: 'Due on confirmation' })
-  @IsOptional()
-  @IsString()
-  dueLabel?: string;
-
-  @ApiPropertyOptional({ example: '2026-03-07T00:00:00.000Z' })
-  @IsOptional()
-  @IsDateString()
-  dueAt?: string;
 }
 
 export class SendQuoteDto {
@@ -68,12 +45,13 @@ export class SendQuoteDto {
   @Type(() => QuoteLineItemDto)
   lineItems: QuoteLineItemDto[];
 
-  @ApiPropertyOptional({ type: [QuotePaymentTermDto], description: 'Milestone terms; omit for pay-at-once' })
+  @ApiPropertyOptional({
+    description:
+      'Free-text payment terms the vendor writes (e.g. "50% on booking, balance on delivery"). Not enforced by the platform.',
+  })
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => QuotePaymentTermDto)
-  paymentTerms?: QuotePaymentTermDto[];
+  @IsString()
+  paymentTerms?: string;
 
   @ApiPropertyOptional({ example: 7, description: 'Days the quote stays valid (default 7)' })
   @IsOptional()

@@ -141,9 +141,8 @@ export class FulfilmentService {
     return { completed: true };
   }
 
-  /** Vendor confirms a rental was returned → COMPLETED + deposit refunded
-   *  (attestation; funds are direct-to-vendor, so the refund itself is the
-   *  vendor's to send) + review request. */
+  /** Vendor confirms a rental was returned → COMPLETED + review request.
+   *  (Any deposit is agreed and refunded off-platform between the parties.) */
   async confirmReturn(vendorUserId: string, bookingId: string) {
     const vendor = await this.vendorFor(vendorUserId);
     const booking = await this.prisma.booking.findUnique({
@@ -153,7 +152,6 @@ export class FulfilmentService {
         clientId: true,
         vendorId: true,
         status: true,
-        depositAmount: true,
         listing: { select: { title: true } },
         invoice: { select: { conversationId: true } },
       },
@@ -170,8 +168,6 @@ export class FulfilmentService {
     }
     const conversationId = booking.invoice?.conversationId;
     if (!conversationId) throw new BadRequestException('No conversation for this booking');
-
-    const deposit = booking.depositAmount ? booking.depositAmount.toNumber() : 0;
 
     const cardIds = await this.prisma.$transaction(async (tx) => {
       await tx.booking.update({
@@ -195,42 +191,26 @@ export class FulfilmentService {
         content: 'Item returned — rental complete',
         metadata: { status: 'returned' },
       });
-      const ids = [returned.id];
-      if (deposit > 0) {
-        const refund = await this.cards.post(tx, {
-          conversationId,
-          senderId: vendorUserId,
-          type: MessageType.DEPOSIT_REFUNDED,
-          bookingId: booking.id,
-          metadata: { amount: deposit.toString() },
-        });
-        ids.push(refund.id);
-      }
       const reviewReq = await this.cards.post(tx, {
         conversationId,
         senderId: vendorUserId,
         type: MessageType.REVIEW_REQUESTED,
         bookingId: booking.id,
       });
-      ids.push(reviewReq.id);
-      return ids;
+      return [returned.id, reviewReq.id];
     });
 
     await this.cards.broadcastMany(cardIds);
     void this.notifications
       .create(
         booking.clientId,
-        deposit > 0
-          ? NotificationType.REFUND_PROCESSED
-          : NotificationType.REVIEW_REQUESTED,
-        deposit > 0 ? 'Deposit refunded 💰' : 'How did it go? ⭐',
-        deposit > 0
-          ? `Your ₦${deposit.toLocaleString()} deposit for "${booking.listing.title}" has been refunded`
-          : `"${booking.listing.title}" is complete — leave a review`,
+        NotificationType.REVIEW_REQUESTED,
+        'How did it go? ⭐',
+        `"${booking.listing.title}" is complete — leave a review`,
         { bookingId },
       )
       .catch(() => void 0);
-    return { completed: true, depositRefunded: deposit > 0 };
+    return { completed: true };
   }
 
   /** Client submits a review (gated to a COMPLETED booking) → REVIEW_SUBMITTED. */

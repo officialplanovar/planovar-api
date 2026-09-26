@@ -1,18 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { QuotePaymentStructure } from '@prisma/client';
 import {
   IsArray,
   IsDateString,
-  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
-  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreateInstallmentDto, CreateQuoteLineItemDto } from './create-quote.dto';
+import { CreateQuoteLineItemDto } from './create-quote.dto';
 
 export class UpdateQuoteDto {
   @ApiPropertyOptional({ type: 'string' })
@@ -30,17 +27,13 @@ export class UpdateQuoteDto {
   @IsOptional()
   validUntil?: string;
 
-  @ApiPropertyOptional({ enum: QuotePaymentStructure, enumName: 'QuotePaymentStructure' })
-  @IsEnum(QuotePaymentStructure)
+  @ApiPropertyOptional({
+    type: 'string',
+    description: 'Free-text payment terms (vendor-written, not enforced).',
+  })
+  @IsString()
   @IsOptional()
-  paymentStructure?: QuotePaymentStructure;
-
-  @ApiPropertyOptional({ type: 'number' })
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  @IsOptional()
-  escrowPercentage?: number;
+  paymentTerms?: string;
 
   @ApiPropertyOptional({ type: 'number' })
   @IsNumber()
@@ -54,11 +47,4 @@ export class UpdateQuoteDto {
   @Type(() => CreateQuoteLineItemDto)
   @IsOptional()
   lineItems?: CreateQuoteLineItemDto[];
-
-  @ApiPropertyOptional({ type: [CreateInstallmentDto], description: 'Replaces all existing installments' })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateInstallmentDto)
-  @IsOptional()
-  installments?: CreateInstallmentDto[];
 }

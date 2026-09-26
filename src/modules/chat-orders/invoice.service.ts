@@ -1,24 +1,15 @@
 import {
   BadRequestException,
-  ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import {
   BookingStatus,
   FulfilmentType,
-  InstallmentStatus,
   InvoiceStatus,
-  MessageType,
-  NotificationType,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { ChatCardService } from './chat-card.service';
-import { PaystackDirectPayService } from './paystack-directpay.service';
 
 /** Minimal shape the invoice needs from an accepted quote. */
 export type QuoteForInvoice = {
@@ -29,27 +20,19 @@ export type QuoteForInvoice = {
   eventId: string | null;
   conversationId: string | null;
   amount: Prisma.Decimal;
-  paymentTerms: Prisma.JsonValue;
+  paymentTerms: string | null;
   lineItems: { label: string; amount: Prisma.Decimal; sortOrder: number }[];
 };
 
-type MilestoneTerm = {
-  label: string;
-  percentage: number;
-  dueLabel?: string;
-  dueAt?: string;
-};
-
+/**
+ * Builds DISPLAY-ONLY invoices from an accepted quote or a direct order. An
+ * invoice is a record of the agreement (line items, total, free-text payment
+ * terms) — the platform does not charge anyone. Client↔vendor payment happens
+ * off-platform.
+ */
 @Injectable()
 export class InvoiceService {
-  constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(PaystackDirectPayService)
-    private readonly paystack: PaystackDirectPayService,
-    @Inject(ChatCardService) private readonly cards: ChatCardService,
-    @Inject(NotificationsService)
-    private readonly notifications: NotificationsService,
-  ) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   private ref(prefix: string): string {
     return `${prefix}-${Date.now().toString(36).toUpperCase()}${Math.floor(
@@ -60,8 +43,8 @@ export class InvoiceService {
   }
 
   /**
-   * Materialize an Invoice (+ line items + payable milestones) and the Booking
-   * from an accepted quote. Must be called inside the accept transaction.
+   * Materialize a display-only Invoice (+ line items) and the Booking from an
+   * accepted quote. Must be called inside the accept transaction.
    */
   async createFromQuoteTx(
     tx: Prisma.TransactionClient,
@@ -110,6 +93,8 @@ export class InvoiceService {
         listingId: quote.listingId,
         subtotal: quote.amount,
         total: quote.amount,
+        // Free-text terms the vendor wrote on the quote, carried through for display.
+        notes: quote.paymentTerms ?? null,
         status: InvoiceStatus.ACCEPTED,
         lineItems: {
           create: quote.lineItems.map((li, i) => ({
@@ -121,31 +106,12 @@ export class InvoiceService {
       },
     });
 
-    // Milestones from the quote's proposed terms (or a single 100% tranche).
-    const terms: MilestoneTerm[] = Array.isArray(quote.paymentTerms)
-      ? (quote.paymentTerms as unknown as MilestoneTerm[])
-      : [{ label: 'Full payment', percentage: 100 }];
-    const total = quote.amount.toNumber();
-    await tx.paymentMilestone.createMany({
-      data: terms.map((t, i) => ({
-        invoiceId: invoice.id,
-        label: t.label,
-        dueLabel: t.dueLabel ?? null,
-        percentage: new Prisma.Decimal(t.percentage),
-        amount: new Prisma.Decimal((total * t.percentage) / 100),
-        dueAt: t.dueAt ? new Date(t.dueAt) : null,
-        status: InstallmentStatus.PENDING,
-        sortOrder: i,
-      })),
-    });
-
     return invoice;
   }
 
   /**
-   * Create an invoice + single 100% milestone directly from a booking (the
-   * product/rental order flow, which has no quote). Called inside the accept
-   * transaction so the client can then pay via the same milestone rails.
+   * Create a display-only invoice directly from a booking (the product/rental
+   * order flow, which has no quote). Called inside the accept transaction.
    */
   async createDirectInvoiceTx(
     tx: Prisma.TransactionClient,
@@ -159,6 +125,7 @@ export class InvoiceService {
       };
       conversationId: string;
       lineItems: { label: string; amount: number }[];
+      paymentTerms?: string | null;
     },
   ) {
     const total = args.lineItems.reduce((s, li) => s + li.amount, 0);
@@ -173,6 +140,7 @@ export class InvoiceService {
         listingId: args.booking.listingId,
         subtotal: new Prisma.Decimal(total),
         total: new Prisma.Decimal(total),
+        notes: args.paymentTerms ?? null,
         status: InvoiceStatus.SENT,
         lineItems: {
           create: args.lineItems.map((li, i) => ({
@@ -183,160 +151,6 @@ export class InvoiceService {
         },
       },
     });
-    await tx.paymentMilestone.create({
-      data: {
-        invoiceId: invoice.id,
-        label: 'Full payment',
-        dueLabel: 'Due now',
-        percentage: new Prisma.Decimal(100),
-        amount: new Prisma.Decimal(total),
-        status: InstallmentStatus.PENDING,
-        sortOrder: 0,
-      },
-    });
     return invoice;
-  }
-
-  /**
-   * Client initiates payment of a milestone → returns a Paystack checkout URL.
-   * The vendor's subaccount receives the net; the client bears the fee.
-   */
-  async payMilestone(userId: string, milestoneId: string) {
-    const milestone = await this.prisma.paymentMilestone.findUnique({
-      where: { id: milestoneId },
-      include: { invoice: { select: { clientId: true, vendorId: true } } },
-    });
-    if (!milestone) throw new NotFoundException('Milestone not found');
-    if (milestone.invoice.clientId !== userId) {
-      throw new ForbiddenException('Not your invoice');
-    }
-    if (milestone.status === InstallmentStatus.PAID) {
-      throw new ConflictException('This milestone is already paid');
-    }
-
-    const client = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    if (!client?.email) throw new BadRequestException('Client email missing');
-
-    const subaccount = await this.paystack.ensureSubaccount(
-      milestone.invoice.vendorId,
-    );
-    const netKobo = Math.round(milestone.amount.toNumber() * 100);
-    const { chargeKobo, feeKobo } = this.paystack.grossUp(netKobo);
-    const reference = `PM_${milestone.id}_${Date.now()}`;
-
-    const { authorizationUrl } = await this.paystack.initSplitCharge({
-      email: client.email,
-      amountKobo: chargeKobo,
-      subaccountCode: subaccount,
-      reference,
-      metadata: {
-        type: 'milestone',
-        milestoneId: milestone.id,
-        invoiceId: milestone.invoiceId,
-      },
-    });
-
-    await this.prisma.paymentMilestone.update({
-      where: { id: milestone.id },
-      data: {
-        paystackReference: reference,
-        feeAmount: new Prisma.Decimal(feeKobo / 100),
-      },
-    });
-
-    return {
-      authorizationUrl,
-      reference,
-      netAmount: netKobo / 100,
-      feeAmount: feeKobo / 100,
-      chargeAmount: chargeKobo / 100,
-    };
-  }
-
-  /**
-   * Confirm a milestone payment by reference (called by the verify endpoint and
-   * the Paystack webhook). Idempotent — safe to call repeatedly.
-   */
-  async confirmByReference(reference: string): Promise<{ confirmed: boolean }> {
-    const milestone = await this.prisma.paymentMilestone.findFirst({
-      where: { paystackReference: reference },
-      include: {
-        invoice: { select: { id: true, conversationId: true, clientId: true, vendorId: true } },
-      },
-    });
-    if (!milestone) return { confirmed: false };
-    if (milestone.status === InstallmentStatus.PAID) return { confirmed: true };
-
-    const result = await this.paystack.verify(reference);
-    if (result.status !== 'success') return { confirmed: false };
-
-    const cardId = await this.prisma.$transaction(async (tx) => {
-      // Atomically claim the milestone. The verify endpoint and the webhook can
-      // race here — both pass the PAID pre-check above before either commits. A
-      // conditional updateMany means only the first writer proceeds; a 0-count
-      // means another call already paid it, so we skip the duplicate card /
-      // notification / invoice roll-up.
-      const claimed = await tx.paymentMilestone.updateMany({
-        where: { id: milestone.id, status: { not: InstallmentStatus.PAID } },
-        data: { status: InstallmentStatus.PAID, paidAt: new Date() },
-      });
-      if (claimed.count === 0) return null;
-
-      const paidCard = await this.cards.post(tx, {
-        conversationId: milestone.invoice.conversationId,
-        senderId: milestone.invoice.clientId,
-        type: MessageType.MILESTONE_PAID,
-        invoiceId: milestone.invoiceId,
-        metadata: {
-          milestoneId: milestone.id,
-          label: milestone.label,
-          amount: milestone.amount.toString(),
-        },
-      });
-
-      const remaining = await tx.paymentMilestone.count({
-        where: {
-          invoiceId: milestone.invoiceId,
-          status: { not: InstallmentStatus.PAID },
-        },
-      });
-      await tx.invoice.update({
-        where: { id: milestone.invoiceId },
-        data: {
-          status:
-            remaining === 0
-              ? InvoiceStatus.PAID
-              : InvoiceStatus.PARTIALLY_PAID,
-        },
-      });
-      return paidCard.id;
-    });
-
-    // Another concurrent call already confirmed this milestone — idempotent
-    // success with no duplicate side effects.
-    if (cardId === null) return { confirmed: true };
-
-    await this.cards.broadcast(cardId);
-
-    const vendor = await this.prisma.vendorProfile.findUnique({
-      where: { id: milestone.invoice.vendorId },
-      select: { userId: true },
-    });
-    if (vendor) {
-      void this.notifications
-        .create(
-          vendor.userId,
-          NotificationType.PAYMENT_RECEIVED,
-          'Payment received 💰',
-          `A ₦${milestone.amount.toNumber().toLocaleString()} milestone was paid to your account`,
-          { milestoneId: milestone.id, invoiceId: milestone.invoiceId },
-        )
-        .catch(() => void 0);
-    }
-
-    return { confirmed: true };
   }
 }

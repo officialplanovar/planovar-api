@@ -31,8 +31,6 @@ import { EventsModule } from './modules/events/events.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { ChatOrdersModule } from './modules/chat-orders/chat-orders.module';
-import { PaymentsModule } from './modules/payments/payments.module';
-import { PayoutsModule } from './modules/payouts/payouts.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
@@ -88,8 +86,6 @@ import { SearchModule } from './modules/search/search.module';
     BookingsModule,
     QuotesModule,
     ChatOrdersModule,
-    PaymentsModule,
-    PayoutsModule,
     SubscriptionsModule,
     ReviewsModule,
     DisputesModule,

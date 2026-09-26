@@ -13,7 +13,6 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger'
 import type { Request } from 'express';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
 import { FulfilmentService } from './fulfilment.service';
-import { InvoiceService } from './invoice.service';
 import { OrderRequestService } from './order-request.service';
 import { QuoteFlowService } from './quote-flow.service';
 import { TodoService } from './todo.service';
@@ -32,7 +31,6 @@ const uid = (req: Request) => (req as any).user.id as string;
 export class ChatOrdersController {
   constructor(
     @Inject(QuoteFlowService) private readonly quotes: QuoteFlowService,
-    @Inject(InvoiceService) private readonly invoices: InvoiceService,
     @Inject(OrderRequestService) private readonly orders: OrderRequestService,
     @Inject(TodoService) private readonly todos: TodoService,
     @Inject(FulfilmentService) private readonly fulfilment: FulfilmentService,
@@ -67,22 +65,6 @@ export class ChatOrdersController {
     return this.quotes.declineQuote(uid(req), id);
   }
 
-  // ── Milestone payments (direct client→vendor via Paystack) ────────────────
-
-  @Post('milestones/:id/pay')
-  @ApiOperation({ summary: 'Client starts paying a milestone — returns a Paystack checkout URL' })
-  @ApiParam({ name: 'id', description: 'PaymentMilestone UUID' })
-  payMilestone(@Req() req: Request, @Param('id') id: string) {
-    return this.invoices.payMilestone(uid(req), id);
-  }
-
-  @Post('payments/:reference/verify')
-  @ApiOperation({ summary: 'Confirm a milestone payment by Paystack reference (idempotent)' })
-  @ApiParam({ name: 'reference', description: 'Paystack transaction reference' })
-  verify(@Param('reference') reference: string) {
-    return this.invoices.confirmByReference(reference);
-  }
-
   // ── Direct orders (product / rental) ──────────────────────────────────────
 
   @Post('orders')
@@ -92,7 +74,7 @@ export class ChatOrdersController {
   }
 
   @Post('orders/:bookingId/accept')
-  @ApiOperation({ summary: 'Vendor accepts an order → confirms booking + creates a payable invoice' })
+  @ApiOperation({ summary: 'Vendor accepts an order → confirms booking + creates a display-only invoice' })
   @ApiParam({ name: 'bookingId', description: 'Booking UUID' })
   acceptOrder(@Req() req: Request, @Param('bookingId') bookingId: string) {
     return this.orders.respondToOrder(uid(req), bookingId, true);

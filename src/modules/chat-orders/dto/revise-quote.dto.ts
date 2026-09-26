@@ -8,7 +8,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { QuoteLineItemDto, QuotePaymentTermDto } from './send-quote.dto';
+import { QuoteLineItemDto } from './send-quote.dto';
 
 /**
  * A revision of an existing active quote. clientId/listingId/eventId are
@@ -22,12 +22,13 @@ export class ReviseQuoteDto {
   @Type(() => QuoteLineItemDto)
   lineItems: QuoteLineItemDto[];
 
-  @ApiPropertyOptional({ type: [QuotePaymentTermDto] })
+  @ApiPropertyOptional({
+    description:
+      'Free-text payment terms the vendor writes. Not enforced by the platform.',
+  })
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => QuotePaymentTermDto)
-  paymentTerms?: QuotePaymentTermDto[];
+  @IsString()
+  paymentTerms?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
