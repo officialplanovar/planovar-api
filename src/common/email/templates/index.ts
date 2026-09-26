@@ -245,13 +245,13 @@ export const emailTemplates = {
         <h2 style="margin-top:14px;">${data.vendorName} sent you a quote</h2>
         <p>For <strong>${data.listingTitle}</strong>:</p>
         <div class="info-card">
-          <p><strong>Total:</strong> <span class="amount">₦${data.amount}</span></p>
+          <p><strong>Total:</strong> <span class="amount">$${data.amount}</span></p>
           <p><strong>Valid until:</strong> ${data.validUntil}</p>
         </div>
         <p>Review the itemised breakdown and accept or decline in the app.</p>
         <a class="btn" href="https://planovar.com/messages">Review quote</a>
       `,
-        `Quote from ${data.vendorName}: ₦${data.amount}`,
+        `Quote from ${data.vendorName}: $${data.amount}`,
       ),
     };
   },
@@ -265,19 +265,19 @@ export const emailTemplates = {
         <div class="success"><p><strong>${data.clientName}</strong> accepted your quote.</p></div>
         <div class="info-card">
           <p><strong>Service:</strong> ${data.listingTitle}</p>
-          <p><strong>Quoted total:</strong> <span class="amount">₦${data.amount}</span></p>
+          <p><strong>Quoted total:</strong> <span class="amount">$${data.amount}</span></p>
         </div>
         <p>A booking inquiry has been created — coordinate the details with your client in chat.</p>
         <a class="btn" href="https://planovar.com/vendor/bookings">View booking</a>
       `,
-        `${data.clientName} accepted your quote for ₦${data.amount}`,
+        `${data.clientName} accepted your quote for $${data.amount}`,
       ),
     };
   },
 
   paymentReceived(data: { vendorName: string; clientName: string; listingTitle: string; amount: string; installmentLabel?: string }) {
     return {
-      subject: `Payment received — ₦${data.amount}`,
+      subject: `Payment received — $${data.amount}`,
       html: base(
         `
         <h2>Payment received</h2>
@@ -286,37 +286,37 @@ export const emailTemplates = {
           <p><strong>Service:</strong> ${data.listingTitle}</p>
           <p><strong>Client:</strong> ${data.clientName}</p>
           ${data.installmentLabel ? `<p><strong>Instalment:</strong> ${data.installmentLabel}</p>` : ''}
-          <p><strong>Amount:</strong> <span class="amount">₦${data.amount}</span></p>
+          <p><strong>Amount:</strong> <span class="amount">$${data.amount}</span></p>
         </div>
         <a class="btn" href="https://planovar.com/vendor/payments">View payments</a>
       `,
-        `Payment of ₦${data.amount} received from ${data.clientName}`,
+        `Payment of $${data.amount} received from ${data.clientName}`,
       ),
     };
   },
 
   payoutProcessed(data: { vendorName: string; amount: string; bankAccount: string }) {
     return {
-      subject: `Payout of ₦${data.amount} is on its way`,
+      subject: `Payout of $${data.amount} is on its way`,
       html: base(
         `
         <h2>Your payout is on its way 💸</h2>
         <div class="success"><p>Your payout has been processed.</p></div>
         <div class="info-card">
-          <p><strong>Amount:</strong> <span class="amount">₦${data.amount}</span></p>
+          <p><strong>Amount:</strong> <span class="amount">$${data.amount}</span></p>
           <p><strong>Bank account:</strong> ****${data.bankAccount.slice(-4)}</p>
           <p><strong>Estimated arrival:</strong> 1–2 business days</p>
         </div>
         <a class="btn" href="https://planovar.com/vendor/payments">View payout history</a>
       `,
-        `Your payout of ₦${data.amount} is on its way`,
+        `Your payout of $${data.amount} is on its way`,
       ),
     };
   },
 
   installmentDue(data: { clientName: string; vendorName: string; listingTitle: string; amount: string; dueDate: string; label: string }) {
     return {
-      subject: `Payment due: ₦${data.amount} for ${data.listingTitle}`,
+      subject: `Payment due: $${data.amount} for ${data.listingTitle}`,
       html: base(
         `
         <h2>Payment reminder</h2>
@@ -324,12 +324,12 @@ export const emailTemplates = {
         <div class="info-card">
           <p><strong>Service:</strong> ${data.listingTitle}</p>
           <p><strong>Instalment:</strong> ${data.label}</p>
-          <p><strong>Amount due:</strong> <span class="amount">₦${data.amount}</span></p>
+          <p><strong>Amount due:</strong> <span class="amount">$${data.amount}</span></p>
           <p><strong>Due date:</strong> ${data.dueDate}</p>
         </div>
         <a class="btn" href="https://planovar.com/payments">Pay now</a>
       `,
-        `Payment of ₦${data.amount} due on ${data.dueDate}`,
+        `Payment of $${data.amount} due on ${data.dueDate}`,
       ),
     };
   },
@@ -377,7 +377,7 @@ export const emailTemplates = {
       html: base(
         `
         <h2>Welcome aboard, ${data.firstName}! 🥂</h2>
-        <p><strong>Planovar</strong> is where Nigeria's best events come together — vendors, planners, and unforgettable celebrations.</p>
+        <p><strong>Planovar</strong> is where the world's best events come together — vendors, planners, and unforgettable celebrations.</p>
         ${
           isVendor
             ? `<p>Your vendor account is ready. Complete your profile and add your first listing to start reaching thousands of event planners.</p>
