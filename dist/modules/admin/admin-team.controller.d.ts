@@ -3,22 +3,22 @@ export declare class AdminTeamController {
     private readonly admin;
     constructor(admin: AdminService);
     list(): Promise<{
-        email: string;
         id: string;
+        isActive: boolean;
         createdAt: Date;
         name: string;
+        email: string;
         role: import("@prisma/client").$Enums.UserRole;
-        isActive: boolean;
     }[]>;
     promote(body: {
         email: string;
     }): Promise<{
-        email: string;
         id: string;
+        isActive: boolean;
         createdAt: Date;
         name: string;
+        email: string;
         role: import("@prisma/client").$Enums.UserRole;
-        isActive: boolean;
     }[]>;
     setRole(id: string, body: {
         role: string;

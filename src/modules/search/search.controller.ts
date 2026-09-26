@@ -14,7 +14,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { EventType, UserRole } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SessionAuthGuard } from '../../common/guards/session-auth.guard';
@@ -62,6 +62,7 @@ export class SearchController {
   @ApiQuery({ name: 'city', required: false, type: 'string' })
   @ApiQuery({ name: 'country', required: false, type: 'string' })
   @ApiQuery({ name: 'isRentable', required: false, type: 'boolean' })
+  @ApiQuery({ name: 'eventType', required: false, enum: EventType })
   searchListings(@Query() dto: SearchListingsDto) {
     return this.searchService.searchListings(
       dto.q ?? '',
@@ -74,6 +75,7 @@ export class SearchController {
         city: dto.city,
         country: dto.country,
         isRentable: dto.isRentable,
+        eventType: dto.eventType,
       },
       dto.page ?? 1,
       dto.perPage ?? 20,
@@ -91,6 +93,7 @@ export class SearchController {
   @ApiQuery({ name: 'city', required: false, type: 'string' })
   @ApiQuery({ name: 'country', required: false, type: 'string' })
   @ApiQuery({ name: 'isVerified', required: false, type: 'boolean' })
+  @ApiQuery({ name: 'eventType', required: false, enum: EventType })
   searchVendors(@Query() dto: SearchVendorsDto) {
     return this.searchService.searchVendors(
       dto.q ?? '',
@@ -99,6 +102,7 @@ export class SearchController {
         city: dto.city,
         country: dto.country,
         isVerified: dto.isVerified,
+        eventType: dto.eventType,
       },
       dto.page ?? 1,
       dto.perPage ?? 20,

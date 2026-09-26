@@ -11,29 +11,32 @@ export declare class AdminVendorsController {
     constructor(vendorsService: VendorsService, admin: AdminService, audit: AuditService);
     list(query: VendorQueryDto): Promise<{
         data: {
-            user: {
-                email: string;
-                id: string;
-                name: string;
-                phone: string | null;
-                isActive: boolean;
-            };
             id: string;
-            createdAt: Date;
             tags: string[];
-            kycStatus: import("@prisma/client").$Enums.KycStatus;
-            businessName: string;
+            location: import("@prisma/client/runtime/client").JsonValue;
+            reviewCount: number;
+            createdAt: Date;
+            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
             slug: string;
+            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            isVerified: boolean;
+            businessName: string;
             businessType: import("@prisma/client").$Enums.VendorBusinessType | null;
             vendorType: import("@prisma/client").$Enums.VendorType;
-            location: import("@prisma/client/runtime/client").JsonValue;
-            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
-            reviewCount: number;
-            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
-            ninDocumentUrl: string | null;
-            cacDocumentUrl: string | null;
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
+            idDocumentUrl: string | null;
+            idType: string | null;
+            idCountry: string | null;
+            businessRegDocumentUrl: string | null;
+            businessRegCountry: string | null;
             kycSubmittedAt: Date | null;
-            isVerified: boolean;
+            user: {
+                id: string;
+                isActive: boolean;
+                name: string;
+                phone: string | null;
+                email: string;
+            };
         }[];
         meta: {
             total: number;
@@ -43,19 +46,22 @@ export declare class AdminVendorsController {
     }>;
     listPendingKyc(): Promise<{
         id: string;
-        businessName: string;
-        slug: string;
-        businessType: import("@prisma/client").$Enums.VendorBusinessType | null;
         location: import("@prisma/client/runtime/client").JsonValue;
-        ninDocumentUrl: string | null;
-        cacDocumentUrl: string | null;
+        slug: string;
+        businessName: string;
+        businessType: import("@prisma/client").$Enums.VendorBusinessType | null;
+        idDocumentUrl: string | null;
+        idType: string | null;
+        idCountry: string | null;
+        businessRegDocumentUrl: string | null;
+        businessRegCountry: string | null;
         kycSubmittedAt: Date | null;
     }[]>;
     reviewKyc(req: Request, id: string, dto: ReviewKycDto): Promise<{
         id: string;
+        isVerified: boolean;
         kycStatus: import("@prisma/client").$Enums.KycStatus;
         kycReviewedAt: Date | null;
         kycRejectionReason: string | null;
-        isVerified: boolean;
     }>;
 }

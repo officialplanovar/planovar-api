@@ -33,37 +33,37 @@ export declare class MessagingGateway implements OnGatewayConnection, OnGatewayD
             fileSize: number;
         }>;
     }): Promise<{
+        sender: {
+            id: string;
+            image: string | null;
+            name: string;
+        };
         attachments: {
-            url: string;
             id: string;
             createdAt: Date;
+            url: string;
             publicId: string | null;
             fileName: string | null;
             fileType: string;
             fileSize: number;
             messageId: string;
         }[];
-        sender: {
-            id: string;
-            name: string;
-            image: string | null;
-        };
     } & {
-        metadata: import("@prisma/client/runtime/client").JsonValue | null;
-        type: import("@prisma/client").$Enums.MessageType;
         id: string;
         createdAt: Date;
+        type: import("@prisma/client").$Enums.MessageType;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
         content: string | null;
-        conversationId: string;
-        senderId: string;
-        voiceUrl: string | null;
-        voiceDuration: number | null;
-        quoteId: string | null;
-        invoiceId: string | null;
-        bookingId: string | null;
-        todoId: string | null;
         isRead: boolean;
         readAt: Date | null;
+        bookingId: string | null;
+        conversationId: string;
+        quoteId: string | null;
+        invoiceId: string | null;
+        voiceUrl: string | null;
+        voiceDuration: number | null;
+        senderId: string;
+        todoId: string | null;
     }>;
     handleCallInvite(client: Socket, payload: {
         conversationId: string;

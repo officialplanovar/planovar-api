@@ -5,17 +5,17 @@ export declare class AdminSubscriptionsController {
     constructor(admin: AdminService);
     list(query: SubscriptionQueryDto): Promise<{
         data: {
-            id: string;
-            createdAt: Date;
             vendor: {
-                user: {
-                    email: string;
-                    id: string;
-                    name: string;
-                };
                 id: string;
                 businessName: string;
+                user: {
+                    id: string;
+                    name: string;
+                    email: string;
+                };
             };
+            id: string;
+            createdAt: Date;
             status: import("@prisma/client").$Enums.SubscriptionStatus;
             billingCycle: import("@prisma/client").$Enums.BillingCycle;
             currentPeriodStart: Date;

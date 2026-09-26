@@ -1,0 +1,281 @@
+import { Prisma, UserRole } from '@prisma/client';
+import { EmailService } from '../../common/email/email.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CreateQuoteDto } from './dto/create-quote.dto';
+import { UpdateQuoteDto } from './dto/update-quote.dto';
+export declare class QuotesService {
+    private readonly prisma;
+    private readonly email;
+    private readonly notifications;
+    constructor(prisma: PrismaService, email: EmailService, notifications: NotificationsService);
+    private getVendorProfile;
+    private assertVendorOwns;
+    private assertClientOwns;
+    create(userId: string, dto: CreateQuoteDto): Promise<{
+        id: string;
+        description: string | null;
+        vendorId: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        listingId: string | null;
+        clientId: string | null;
+        status: import("@prisma/client").$Enums.QuoteStatus;
+        notes: string | null;
+        eventId: string | null;
+        bookingId: string | null;
+        quoteNumber: string | null;
+        conversationId: string | null;
+        amount: Prisma.Decimal;
+        paymentTerms: string | null;
+        validUntil: Date;
+        version: number;
+        parentQuoteId: string | null;
+        isLocked: boolean;
+        lockedAt: Date | null;
+    }>;
+    findAll(userId: string, role: UserRole): Promise<({
+        booking: {
+            id: string;
+            eventDate: Date;
+        } | null;
+    } & {
+        id: string;
+        description: string | null;
+        vendorId: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        listingId: string | null;
+        clientId: string | null;
+        status: import("@prisma/client").$Enums.QuoteStatus;
+        notes: string | null;
+        eventId: string | null;
+        bookingId: string | null;
+        quoteNumber: string | null;
+        conversationId: string | null;
+        amount: Prisma.Decimal;
+        paymentTerms: string | null;
+        validUntil: Date;
+        version: number;
+        parentQuoteId: string | null;
+        isLocked: boolean;
+        lockedAt: Date | null;
+    })[]>;
+    findOne(id: string, userId: string): Promise<{
+        vendor: {
+            id: string;
+            slug: string;
+            userId: string;
+            businessName: string;
+        };
+        booking: {
+            id: string;
+            eventDate: Date;
+            clientId: string;
+            status: import("@prisma/client").$Enums.BookingStatus;
+        } | null;
+        lineItems: {
+            id: string;
+            createdAt: Date;
+            sortOrder: number;
+            amount: Prisma.Decimal;
+            quoteId: string;
+            label: string;
+        }[];
+    } & {
+        id: string;
+        description: string | null;
+        vendorId: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        listingId: string | null;
+        clientId: string | null;
+        status: import("@prisma/client").$Enums.QuoteStatus;
+        notes: string | null;
+        eventId: string | null;
+        bookingId: string | null;
+        quoteNumber: string | null;
+        conversationId: string | null;
+        amount: Prisma.Decimal;
+        paymentTerms: string | null;
+        validUntil: Date;
+        version: number;
+        parentQuoteId: string | null;
+        isLocked: boolean;
+        lockedAt: Date | null;
+    }>;
+    update(id: string, userId: string, dto: UpdateQuoteDto): Promise<{
+        id: string;
+        description: string | null;
+        vendorId: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        listingId: string | null;
+        clientId: string | null;
+        status: import("@prisma/client").$Enums.QuoteStatus;
+        notes: string | null;
+        eventId: string | null;
+        bookingId: string | null;
+        quoteNumber: string | null;
+        conversationId: string | null;
+        amount: Prisma.Decimal;
+        paymentTerms: string | null;
+        validUntil: Date;
+        version: number;
+        parentQuoteId: string | null;
+        isLocked: boolean;
+        lockedAt: Date | null;
+    }>;
+    accept(id: string, userId: string): Promise<{
+        vendor: {
+            user: {
+                id: string;
+                name: string;
+                email: string;
+                firstName: string | null;
+            };
+        } & {
+            id: string;
+            description: string | null;
+            tags: string[];
+            location: Prisma.JsonValue;
+            reviewCount: number;
+            createdAt: Date;
+            ratingAvg: Prisma.Decimal;
+            slug: string;
+            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            isVerified: boolean;
+            coverUrl: string | null;
+            updatedAt: Date;
+            userId: string;
+            businessName: string;
+            logoUrl: string | null;
+            portfolioUrls: string[];
+            phone: string | null;
+            email: string | null;
+            businessType: import("@prisma/client").$Enums.VendorBusinessType | null;
+            vendorType: import("@prisma/client").$Enums.VendorType;
+            serviceRadiusKm: number | null;
+            eventTypes: import("@prisma/client").$Enums.EventType[];
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
+            idDocumentUrl: string | null;
+            idType: string | null;
+            idCountry: string | null;
+            businessRegDocumentUrl: string | null;
+            businessRegCountry: string | null;
+            kycSubmittedAt: Date | null;
+            kycReviewedAt: Date | null;
+            kycReviewedBy: string | null;
+            kycRejectionReason: string | null;
+        };
+        booking: ({
+            client: {
+                id: string;
+                name: string;
+                email: string;
+                firstName: string | null;
+            };
+            listing: {
+                title: string;
+            };
+        } & {
+            id: string;
+            vendorId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            listingId: string;
+            eventDate: Date;
+            clientId: string;
+            status: import("@prisma/client").$Enums.BookingStatus;
+            eventLocation: Prisma.JsonValue;
+            requirements: string | null;
+            quoteAmount: Prisma.Decimal | null;
+            finalAmount: Prisma.Decimal | null;
+            fulfilmentType: import("@prisma/client").$Enums.FulfilmentType | null;
+            deliveryMethod: import("@prisma/client").$Enums.DeliveryMethod | null;
+            pickupAt: Date | null;
+            returnAt: Date | null;
+            notes: string | null;
+            packageId: string | null;
+            eventId: string | null;
+        }) | null;
+    } & {
+        id: string;
+        description: string | null;
+        vendorId: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        listingId: string | null;
+        clientId: string | null;
+        status: import("@prisma/client").$Enums.QuoteStatus;
+        notes: string | null;
+        eventId: string | null;
+        bookingId: string | null;
+        quoteNumber: string | null;
+        conversationId: string | null;
+        amount: Prisma.Decimal;
+        paymentTerms: string | null;
+        validUntil: Date;
+        version: number;
+        parentQuoteId: string | null;
+        isLocked: boolean;
+        lockedAt: Date | null;
+    }>;
+    reject(id: string, userId: string): Promise<{
+        vendor: {
+            userId: string;
+        };
+        booking: ({
+            listing: {
+                title: string;
+            };
+        } & {
+            id: string;
+            vendorId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            listingId: string;
+            eventDate: Date;
+            clientId: string;
+            status: import("@prisma/client").$Enums.BookingStatus;
+            eventLocation: Prisma.JsonValue;
+            requirements: string | null;
+            quoteAmount: Prisma.Decimal | null;
+            finalAmount: Prisma.Decimal | null;
+            fulfilmentType: import("@prisma/client").$Enums.FulfilmentType | null;
+            deliveryMethod: import("@prisma/client").$Enums.DeliveryMethod | null;
+            pickupAt: Date | null;
+            returnAt: Date | null;
+            notes: string | null;
+            packageId: string | null;
+            eventId: string | null;
+        }) | null;
+    } & {
+        id: string;
+        description: string | null;
+        vendorId: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        listingId: string | null;
+        clientId: string | null;
+        status: import("@prisma/client").$Enums.QuoteStatus;
+        notes: string | null;
+        eventId: string | null;
+        bookingId: string | null;
+        quoteNumber: string | null;
+        conversationId: string | null;
+        amount: Prisma.Decimal;
+        paymentTerms: string | null;
+        validUntil: Date;
+        version: number;
+        parentQuoteId: string | null;
+        isLocked: boolean;
+        lockedAt: Date | null;
+    }>;
+}

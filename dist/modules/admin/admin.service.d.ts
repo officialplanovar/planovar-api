@@ -18,19 +18,19 @@ export declare class AdminService {
         };
         recentActivity: ({
             user: {
-                email: string;
                 id: string;
                 name: string;
+                email: string;
             } | null;
         } & {
-            metadata: Prisma.JsonValue | null;
             id: string;
             createdAt: Date;
+            metadata: Prisma.JsonValue | null;
             userId: string | null;
-            ipAddress: string | null;
             action: string;
             resourceType: string;
             resourceId: string | null;
+            ipAddress: string | null;
         })[];
     }>;
     listVendors(params: {
@@ -41,29 +41,32 @@ export declare class AdminService {
         skip?: number;
     }): Promise<{
         data: {
-            user: {
-                email: string;
-                id: string;
-                name: string;
-                phone: string | null;
-                isActive: boolean;
-            };
             id: string;
-            createdAt: Date;
             tags: string[];
-            kycStatus: import("@prisma/client").$Enums.KycStatus;
-            businessName: string;
+            location: Prisma.JsonValue;
+            reviewCount: number;
+            createdAt: Date;
+            ratingAvg: Prisma.Decimal;
             slug: string;
+            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            isVerified: boolean;
+            businessName: string;
             businessType: import("@prisma/client").$Enums.VendorBusinessType | null;
             vendorType: import("@prisma/client").$Enums.VendorType;
-            location: Prisma.JsonValue;
-            ratingAvg: Prisma.Decimal;
-            reviewCount: number;
-            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
-            ninDocumentUrl: string | null;
-            cacDocumentUrl: string | null;
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
+            idDocumentUrl: string | null;
+            idType: string | null;
+            idCountry: string | null;
+            businessRegDocumentUrl: string | null;
+            businessRegCountry: string | null;
             kycSubmittedAt: Date | null;
-            isVerified: boolean;
+            user: {
+                id: string;
+                isActive: boolean;
+                name: string;
+                phone: string | null;
+                email: string;
+            };
         }[];
         meta: {
             total: number;
@@ -79,23 +82,23 @@ export declare class AdminService {
         skip?: number;
     }): Promise<{
         data: {
-            email: string;
             id: string;
-            createdAt: Date;
-            emailVerified: boolean;
-            name: string;
-            role: import("@prisma/client").$Enums.UserRole;
-            phone: string | null;
             isActive: boolean;
-            vendorProfile: {
-                id: string;
-                businessName: string;
-                subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
-            } | null;
+            createdAt: Date;
+            name: string;
             _count: {
                 events: number;
                 bookingsAsClient: number;
             };
+            vendorProfile: {
+                id: string;
+                subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+                businessName: string;
+            } | null;
+            phone: string | null;
+            email: string;
+            emailVerified: boolean;
+            role: import("@prisma/client").$Enums.UserRole;
         }[];
         meta: {
             total: number;
@@ -104,36 +107,36 @@ export declare class AdminService {
         };
     }>;
     getUser(id: string): Promise<{
-        email: string;
         id: string;
-        createdAt: Date;
-        emailVerified: boolean;
-        name: string;
-        role: import("@prisma/client").$Enums.UserRole;
-        phone: string | null;
         isActive: boolean;
-        vendorProfile: {
-            id: string;
-            kycStatus: import("@prisma/client").$Enums.KycStatus;
-            businessName: string;
-            slug: string;
-            ratingAvg: Prisma.Decimal;
-            reviewCount: number;
-            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
-            isVerified: boolean;
-        } | null;
+        createdAt: Date;
+        name: string;
         _count: {
+            reviews: number;
             events: number;
             bookingsAsClient: number;
-            reviews: number;
         };
+        vendorProfile: {
+            id: string;
+            reviewCount: number;
+            ratingAvg: Prisma.Decimal;
+            slug: string;
+            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            isVerified: boolean;
+            businessName: string;
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
+        } | null;
+        phone: string | null;
+        email: string;
+        emailVerified: boolean;
+        role: import("@prisma/client").$Enums.UserRole;
     }>;
     setUserActive(id: string, isActive: boolean, adminId: string, reason?: string, ipAddress?: string): Promise<{
-        email: string;
         id: string;
-        name: string;
-        role: import("@prisma/client").$Enums.UserRole;
         isActive: boolean;
+        name: string;
+        email: string;
+        role: import("@prisma/client").$Enums.UserRole;
     }>;
     listSubscriptions(params: {
         status?: SubscriptionStatus;
@@ -143,17 +146,17 @@ export declare class AdminService {
         skip?: number;
     }): Promise<{
         data: {
-            id: string;
-            createdAt: Date;
             vendor: {
-                user: {
-                    email: string;
-                    id: string;
-                    name: string;
-                };
                 id: string;
                 businessName: string;
+                user: {
+                    id: string;
+                    name: string;
+                    email: string;
+                };
             };
+            id: string;
+            createdAt: Date;
             status: import("@prisma/client").$Enums.SubscriptionStatus;
             billingCycle: import("@prisma/client").$Enums.BillingCycle;
             currentPeriodStart: Date;
@@ -239,20 +242,20 @@ export declare class AdminService {
         features: Prisma.JsonValue;
     }>;
     listAdmins(): Promise<{
-        email: string;
         id: string;
+        isActive: boolean;
         createdAt: Date;
         name: string;
+        email: string;
         role: import("@prisma/client").$Enums.UserRole;
-        isActive: boolean;
     }[]>;
     promoteToAdmin(email: string): Promise<{
-        email: string;
         id: string;
+        isActive: boolean;
         createdAt: Date;
         name: string;
+        email: string;
         role: import("@prisma/client").$Enums.UserRole;
-        isActive: boolean;
     }[]>;
     setUserRole(userId: string, role: string): Promise<{
         id: string;

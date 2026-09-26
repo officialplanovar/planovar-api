@@ -8,47 +8,47 @@ export declare class DisputesController {
     constructor(disputesService: DisputesService);
     create(req: Request, dto: CreateDisputeDto): Promise<{
         id: string;
+        description: string;
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.DisputeStatus;
-        description: string;
         reason: string;
         bookingId: string;
+        raisedBy: string;
         resolution: string | null;
         resolvedBy: string | null;
         resolvedAt: Date | null;
-        raisedBy: string;
     }>;
     findAll(req: Request): Promise<({
         booking: {
             id: string;
-            status: import("@prisma/client").$Enums.BookingStatus;
             eventDate: Date;
+            status: import("@prisma/client").$Enums.BookingStatus;
         };
         raiser: {
-            email: string;
             id: string;
             name: string;
+            email: string;
         };
     } & {
         id: string;
+        description: string;
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.DisputeStatus;
-        description: string;
         reason: string;
         bookingId: string;
+        raisedBy: string;
         resolution: string | null;
         resolvedBy: string | null;
         resolvedAt: Date | null;
-        raisedBy: string;
     })[]>;
     findOne(req: Request, id: string): Promise<{
         booking: {
             client: {
-                email: string;
                 id: string;
                 name: string;
+                email: string;
             };
             vendor: {
                 id: string;
@@ -57,15 +57,13 @@ export declare class DisputesController {
             };
         } & {
             id: string;
+            vendorId: string;
             createdAt: Date;
             updatedAt: Date;
-            vendorId: string;
-            status: import("@prisma/client").$Enums.BookingStatus;
-            clientId: string;
-            eventId: string | null;
             listingId: string;
             eventDate: Date;
-            packageId: string | null;
+            clientId: string;
+            status: import("@prisma/client").$Enums.BookingStatus;
             eventLocation: import("@prisma/client/runtime/client").JsonValue;
             requirements: string | null;
             quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -75,49 +73,51 @@ export declare class DisputesController {
             pickupAt: Date | null;
             returnAt: Date | null;
             notes: string | null;
+            packageId: string | null;
+            eventId: string | null;
         };
         raiser: {
-            email: string;
             id: string;
             name: string;
+            email: string;
         };
     } & {
         id: string;
+        description: string;
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.DisputeStatus;
-        description: string;
         reason: string;
         bookingId: string;
+        raisedBy: string;
         resolution: string | null;
         resolvedBy: string | null;
         resolvedAt: Date | null;
-        raisedBy: string;
     }>;
     updateStatus(req: Request, id: string, status: DisputeStatus): Promise<{
         id: string;
+        description: string;
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.DisputeStatus;
-        description: string;
         reason: string;
         bookingId: string;
+        raisedBy: string;
         resolution: string | null;
         resolvedBy: string | null;
         resolvedAt: Date | null;
-        raisedBy: string;
     }>;
     resolve(req: Request, id: string, dto: ResolveDisputeDto): Promise<{
         id: string;
+        description: string;
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.DisputeStatus;
-        description: string;
         reason: string;
         bookingId: string;
+        raisedBy: string;
         resolution: string | null;
         resolvedBy: string | null;
         resolvedAt: Date | null;
-        raisedBy: string;
     }>;
 }

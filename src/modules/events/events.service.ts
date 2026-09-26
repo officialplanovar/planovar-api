@@ -29,6 +29,7 @@ export class EventsService {
       data: {
         clientId: userId,
         name: dto.title,
+        ...(dto.type !== undefined && { type: dto.type }),
         description: dto.description,
         eventDate: new Date(dto.eventDate),
         location: dto.location ? { address: dto.location } : Prisma.JsonNull,
@@ -129,6 +130,7 @@ export class EventsService {
       where: { id },
       data: {
         name: dto.title,
+        type: dto.type,
         description: dto.description,
         eventDate: dto.eventDate ? new Date(dto.eventDate) : undefined,
         location: dto.location ? { address: dto.location } : undefined,

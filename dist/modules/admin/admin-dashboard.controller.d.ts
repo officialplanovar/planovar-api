@@ -15,19 +15,19 @@ export declare class AdminDashboardController {
         };
         recentActivity: ({
             user: {
-                email: string;
                 id: string;
                 name: string;
+                email: string;
             } | null;
         } & {
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             id: string;
             createdAt: Date;
+            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             userId: string | null;
-            ipAddress: string | null;
             action: string;
             resourceType: string;
             resourceId: string | null;
+            ipAddress: string | null;
         })[];
     }>;
     revenue(): Promise<{

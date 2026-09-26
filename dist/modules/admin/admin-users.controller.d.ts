@@ -7,23 +7,23 @@ export declare class AdminUsersController {
     constructor(admin: AdminService);
     list(query: UserQueryDto): Promise<{
         data: {
-            email: string;
             id: string;
-            createdAt: Date;
-            emailVerified: boolean;
-            name: string;
-            role: import("@prisma/client").$Enums.UserRole;
-            phone: string | null;
             isActive: boolean;
-            vendorProfile: {
-                id: string;
-                businessName: string;
-                subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
-            } | null;
+            createdAt: Date;
+            name: string;
             _count: {
                 events: number;
                 bookingsAsClient: number;
             };
+            vendorProfile: {
+                id: string;
+                subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+                businessName: string;
+            } | null;
+            phone: string | null;
+            email: string;
+            emailVerified: boolean;
+            role: import("@prisma/client").$Enums.UserRole;
         }[];
         meta: {
             total: number;
@@ -32,35 +32,35 @@ export declare class AdminUsersController {
         };
     }>;
     getOne(id: string): Promise<{
-        email: string;
         id: string;
-        createdAt: Date;
-        emailVerified: boolean;
-        name: string;
-        role: import("@prisma/client").$Enums.UserRole;
-        phone: string | null;
         isActive: boolean;
-        vendorProfile: {
-            id: string;
-            kycStatus: import("@prisma/client").$Enums.KycStatus;
-            businessName: string;
-            slug: string;
-            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
-            reviewCount: number;
-            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
-            isVerified: boolean;
-        } | null;
+        createdAt: Date;
+        name: string;
         _count: {
+            reviews: number;
             events: number;
             bookingsAsClient: number;
-            reviews: number;
         };
+        vendorProfile: {
+            id: string;
+            reviewCount: number;
+            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
+            slug: string;
+            subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            isVerified: boolean;
+            businessName: string;
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
+        } | null;
+        phone: string | null;
+        email: string;
+        emailVerified: boolean;
+        role: import("@prisma/client").$Enums.UserRole;
     }>;
     setStatus(req: Request, id: string, dto: SetUserActiveDto): Promise<{
-        email: string;
         id: string;
-        name: string;
-        role: import("@prisma/client").$Enums.UserRole;
         isActive: boolean;
+        name: string;
+        email: string;
+        role: import("@prisma/client").$Enums.UserRole;
     }>;
 }

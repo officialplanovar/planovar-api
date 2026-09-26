@@ -1,10 +1,23 @@
 import { Inject, Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { EventType } from '@prisma/client';
 import { Client } from 'typesense';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TYPESENSE_CLIENT } from './typesense.provider';
 import { LISTINGS_COLLECTION, listingsSchema } from './schemas/listings.schema';
 import { VENDORS_COLLECTION, vendorsSchema } from './schemas/vendors.schema';
 import { EVENTS_COLLECTION, eventsSchema } from './schemas/events.schema';
+
+// A vendor with no declared event types serves all of them. Index the full set
+// for such vendors so an `event_types` filter for any single type still matches.
+const ALL_EVENT_TYPES = Object.values(EventType) as string[];
+
+/** Maps a vendor's declared event types to the strings indexed in Typesense,
+ *  expanding an empty selection to "serves all". */
+function eventTypesForIndex(eventTypes: unknown): string[] {
+  return Array.isArray(eventTypes) && eventTypes.length > 0
+    ? (eventTypes as string[])
+    : ALL_EVENT_TYPES;
+}
 
 @Injectable()
 export class TypesenseSyncService implements OnModuleInit {
@@ -179,6 +192,8 @@ export class TypesenseSyncService implements OnModuleInit {
       vendorName: vendor.businessName ?? '',
       vendorSlug: vendor.slug ?? '',
       vendorTier: vendor.subscriptionTier ?? 'BASIC',
+      // Event types the owning vendor serves (empty = serves all → full set).
+      vendorEventTypes: eventTypesForIndex(vendor.eventTypes),
       // Clients only see listings from verified vendors (flips on KYC approval).
       vendorVerified: vendor.isVerified ?? false,
       rating: Number(listing.ratingAvg ?? 0),
@@ -254,6 +269,8 @@ export class TypesenseSyncService implements OnModuleInit {
       ratingAvg: Number(vendor.ratingAvg ?? 0),
       reviewCount: vendor.reviewCount ?? 0,
       subscriptionTier: vendor.subscriptionTier ?? 'BASIC',
+      // Event types the vendor serves (empty = serves all → full set).
+      event_types: eventTypesForIndex(vendor.eventTypes),
       isVerified: vendor.isVerified ?? false,
       // Cover image for search cards; fall back to the logo so tiles aren't blank.
       ...(vendor.coverUrl || vendor.logoUrl

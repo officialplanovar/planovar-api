@@ -18,6 +18,7 @@ export const vendorsSchema: CollectionCreateSchema = {
     { name: 'ratingAvg', type: 'float' },
     { name: 'reviewCount', type: 'int32' },
     { name: 'subscriptionTier', type: 'string', facet: true },
+    { name: 'event_types', type: 'string[]', facet: true, optional: true },
     { name: 'isVerified', type: 'bool' },
     { name: 'coverUrl', type: 'string', optional: true },
     { name: 'createdAt', type: 'int64' },

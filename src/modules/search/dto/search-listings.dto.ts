@@ -1,7 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { EventType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -72,6 +74,15 @@ export class SearchListingsDto {
   @Type(() => Boolean)
   @IsBoolean()
   isRentable?: boolean;
+
+  @ApiPropertyOptional({
+    enum: EventType,
+    description:
+      'Filter to listings whose vendor serves this event type (vendors with no declared event types serve all)',
+  })
+  @IsOptional()
+  @IsEnum(EventType)
+  eventType?: EventType;
 }
 
 export class SearchVendorsDto {
@@ -114,6 +125,15 @@ export class SearchVendorsDto {
   @Type(() => Boolean)
   @IsBoolean()
   isVerified?: boolean;
+
+  @ApiPropertyOptional({
+    enum: EventType,
+    description:
+      'Filter to vendors serving this event type (vendors with no declared event types serve all)',
+  })
+  @IsOptional()
+  @IsEnum(EventType)
+  eventType?: EventType;
 }
 
 export class SearchEventsDto {

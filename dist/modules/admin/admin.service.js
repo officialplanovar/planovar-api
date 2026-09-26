@@ -94,8 +94,11 @@ let AdminService = class AdminService {
                     subscriptionTier: true,
                     kycStatus: true,
                     isVerified: true,
-                    ninDocumentUrl: true,
-                    cacDocumentUrl: true,
+                    idDocumentUrl: true,
+                    idType: true,
+                    idCountry: true,
+                    businessRegDocumentUrl: true,
+                    businessRegCountry: true,
                     kycSubmittedAt: true,
                     createdAt: true,
                     user: {

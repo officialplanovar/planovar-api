@@ -6,36 +6,36 @@ export declare class ReviewsController {
     private readonly reviewsService;
     constructor(reviewsService: ReviewsService);
     create(req: Request, dto: CreateReviewDto): Promise<{
-        body: string;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        vendorId: string;
-        isVerified: boolean;
-        title: string | null;
-        bookingId: string;
         rating: number;
+        id: string;
+        title: string | null;
+        vendorId: string;
+        createdAt: Date;
+        isVerified: boolean;
+        updatedAt: Date;
+        body: string;
+        bookingId: string;
         reviewerId: string;
     }>;
     findMyReviews(req: Request, take?: string, skip?: string): Promise<{
         data: ({
             vendor: {
-                businessName: string;
                 slug: string;
+                businessName: string;
             };
             booking: {
                 eventDate: Date;
             };
         } & {
-            body: string;
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            vendorId: string;
-            isVerified: boolean;
-            title: string | null;
-            bookingId: string;
             rating: number;
+            id: string;
+            title: string | null;
+            vendorId: string;
+            createdAt: Date;
+            isVerified: boolean;
+            updatedAt: Date;
+            body: string;
+            bookingId: string;
             reviewerId: string;
         })[];
         meta: {
@@ -48,27 +48,27 @@ export declare class ReviewsController {
     findAllForVendor(vendorId: string, take?: string, skip?: string): Promise<{
         data: ({
             reviewer: {
-                name: string;
                 image: string | null;
+                name: string;
             };
             response: {
-                body: string;
                 id: string;
+                vendorId: string;
                 createdAt: Date;
                 updatedAt: Date;
-                vendorId: string;
+                body: string;
                 reviewId: string;
             } | null;
         } & {
-            body: string;
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            vendorId: string;
-            isVerified: boolean;
-            title: string | null;
-            bookingId: string;
             rating: number;
+            id: string;
+            title: string | null;
+            vendorId: string;
+            createdAt: Date;
+            isVerified: boolean;
+            updatedAt: Date;
+            body: string;
+            bookingId: string;
             reviewerId: string;
         })[];
         meta: {
@@ -82,40 +82,40 @@ export declare class ReviewsController {
     findOne(id: string): Promise<{
         vendor: {
             id: string;
-            businessName: string;
             slug: string;
+            businessName: string;
         };
         reviewer: {
             id: string;
-            name: string;
             image: string | null;
+            name: string;
         };
         response: {
-            body: string;
             id: string;
+            vendorId: string;
             createdAt: Date;
             updatedAt: Date;
-            vendorId: string;
+            body: string;
             reviewId: string;
         } | null;
     } & {
-        body: string;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        vendorId: string;
-        isVerified: boolean;
-        title: string | null;
-        bookingId: string;
         rating: number;
+        id: string;
+        title: string | null;
+        vendorId: string;
+        createdAt: Date;
+        isVerified: boolean;
+        updatedAt: Date;
+        body: string;
+        bookingId: string;
         reviewerId: string;
     }>;
     respond(req: Request, id: string, dto: ReviewResponseDto): Promise<{
-        body: string;
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
+        body: string;
         reviewId: string;
     }>;
 }

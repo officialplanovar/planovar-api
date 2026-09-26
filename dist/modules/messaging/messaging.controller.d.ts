@@ -9,83 +9,83 @@ export declare class MessagingController {
         participants: {
             id: string;
             userId: string;
-            conversationId: string;
             unreadCount: number;
+            conversationId: string;
             lastReadAt: Date | null;
             joinedAt: Date;
         }[];
     } & {
-        type: import("@prisma/client").$Enums.ConversationType;
         id: string;
-        createdAt: Date;
         vendorId: string | null;
-        bookingId: string | null;
+        createdAt: Date;
+        type: import("@prisma/client").$Enums.ConversationType;
         clientId: string;
         eventId: string | null;
+        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }>;
     getOrCreateEventGroup(req: Request, eventId: string): Promise<({
         vendor: {
+            coverUrl: string | null;
             businessName: string;
             logoUrl: string | null;
-            coverUrl: string | null;
         } | null;
         messages: ({
+            sender: {
+                id: string;
+                image: string | null;
+                name: string;
+            };
             attachments: {
-                url: string;
                 id: string;
                 createdAt: Date;
+                url: string;
                 publicId: string | null;
                 fileName: string | null;
                 fileType: string;
                 fileSize: number;
                 messageId: string;
             }[];
-            sender: {
-                id: string;
-                name: string;
-                image: string | null;
-            };
         } & {
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            type: import("@prisma/client").$Enums.MessageType;
             id: string;
             createdAt: Date;
+            type: import("@prisma/client").$Enums.MessageType;
+            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             content: string | null;
-            conversationId: string;
-            senderId: string;
-            voiceUrl: string | null;
-            voiceDuration: number | null;
-            quoteId: string | null;
-            invoiceId: string | null;
-            bookingId: string | null;
-            todoId: string | null;
             isRead: boolean;
             readAt: Date | null;
+            bookingId: string | null;
+            conversationId: string;
+            quoteId: string | null;
+            invoiceId: string | null;
+            voiceUrl: string | null;
+            voiceDuration: number | null;
+            senderId: string;
+            todoId: string | null;
         })[];
         participants: ({
             user: {
                 id: string;
-                name: string;
                 image: string | null;
+                name: string;
             };
         } & {
             id: string;
             userId: string;
-            conversationId: string;
             unreadCount: number;
+            conversationId: string;
             lastReadAt: Date | null;
             joinedAt: Date;
         })[];
     } & {
-        type: import("@prisma/client").$Enums.ConversationType;
         id: string;
-        createdAt: Date;
         vendorId: string | null;
-        bookingId: string | null;
+        createdAt: Date;
+        type: import("@prisma/client").$Enums.ConversationType;
         clientId: string;
         eventId: string | null;
+        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }) | null>;
@@ -97,26 +97,26 @@ export declare class MessagingController {
                 name: string;
             };
         } & {
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            type: import("@prisma/client").$Enums.MessageType;
             id: string;
             createdAt: Date;
+            type: import("@prisma/client").$Enums.MessageType;
+            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             content: string | null;
-            conversationId: string;
-            senderId: string;
-            voiceUrl: string | null;
-            voiceDuration: number | null;
-            quoteId: string | null;
-            invoiceId: string | null;
-            bookingId: string | null;
-            todoId: string | null;
             isRead: boolean;
             readAt: Date | null;
+            bookingId: string | null;
+            conversationId: string;
+            quoteId: string | null;
+            invoiceId: string | null;
+            voiceUrl: string | null;
+            voiceDuration: number | null;
+            senderId: string;
+            todoId: string | null;
         };
         vendor: {
+            coverUrl: string | null;
             businessName: string;
             logoUrl: string | null;
-            coverUrl: string | null;
         } | null;
         messages: ({
             sender: {
@@ -124,154 +124,148 @@ export declare class MessagingController {
                 name: string;
             };
         } & {
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            type: import("@prisma/client").$Enums.MessageType;
             id: string;
             createdAt: Date;
+            type: import("@prisma/client").$Enums.MessageType;
+            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             content: string | null;
-            conversationId: string;
-            senderId: string;
-            voiceUrl: string | null;
-            voiceDuration: number | null;
-            quoteId: string | null;
-            invoiceId: string | null;
-            bookingId: string | null;
-            todoId: string | null;
             isRead: boolean;
             readAt: Date | null;
+            bookingId: string | null;
+            conversationId: string;
+            quoteId: string | null;
+            invoiceId: string | null;
+            voiceUrl: string | null;
+            voiceDuration: number | null;
+            senderId: string;
+            todoId: string | null;
         })[];
         participants: ({
             user: {
                 id: string;
-                name: string;
                 image: string | null;
+                name: string;
             };
         } & {
             id: string;
             userId: string;
-            conversationId: string;
             unreadCount: number;
+            conversationId: string;
             lastReadAt: Date | null;
             joinedAt: Date;
         })[];
-        type: import("@prisma/client").$Enums.ConversationType;
         id: string;
-        createdAt: Date;
         vendorId: string | null;
-        bookingId: string | null;
+        createdAt: Date;
+        type: import("@prisma/client").$Enums.ConversationType;
         clientId: string;
         eventId: string | null;
+        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }[]>;
     getConversation(req: Request, id: string): Promise<({
         vendor: {
+            coverUrl: string | null;
             businessName: string;
             logoUrl: string | null;
-            coverUrl: string | null;
         } | null;
         messages: ({
+            sender: {
+                id: string;
+                image: string | null;
+                name: string;
+            };
             attachments: {
-                url: string;
                 id: string;
                 createdAt: Date;
+                url: string;
                 publicId: string | null;
                 fileName: string | null;
                 fileType: string;
                 fileSize: number;
                 messageId: string;
             }[];
-            sender: {
-                id: string;
-                name: string;
-                image: string | null;
-            };
         } & {
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            type: import("@prisma/client").$Enums.MessageType;
             id: string;
             createdAt: Date;
+            type: import("@prisma/client").$Enums.MessageType;
+            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             content: string | null;
-            conversationId: string;
-            senderId: string;
-            voiceUrl: string | null;
-            voiceDuration: number | null;
-            quoteId: string | null;
-            invoiceId: string | null;
-            bookingId: string | null;
-            todoId: string | null;
             isRead: boolean;
             readAt: Date | null;
+            bookingId: string | null;
+            conversationId: string;
+            quoteId: string | null;
+            invoiceId: string | null;
+            voiceUrl: string | null;
+            voiceDuration: number | null;
+            senderId: string;
+            todoId: string | null;
         })[];
         participants: ({
             user: {
                 id: string;
-                name: string;
                 image: string | null;
+                name: string;
             };
         } & {
             id: string;
             userId: string;
-            conversationId: string;
             unreadCount: number;
+            conversationId: string;
             lastReadAt: Date | null;
             joinedAt: Date;
         })[];
     } & {
-        type: import("@prisma/client").$Enums.ConversationType;
         id: string;
-        createdAt: Date;
         vendorId: string | null;
-        bookingId: string | null;
+        createdAt: Date;
+        type: import("@prisma/client").$Enums.ConversationType;
         clientId: string;
         eventId: string | null;
+        bookingId: string | null;
         groupName: string | null;
         lastMessageAt: Date | null;
     }) | null>;
     getMessages(req: Request, id: string, take?: string, cursor?: string): Promise<({
-        attachments: {
-            url: string;
+        booking: {
             id: string;
-            createdAt: Date;
-            publicId: string | null;
-            fileName: string | null;
-            fileType: string;
-            fileSize: number;
-            messageId: string;
-        }[];
-        sender: {
-            id: string;
-            name: string;
-            image: string | null;
-        };
+            listing: {
+                title: string;
+            };
+            status: import("@prisma/client").$Enums.BookingStatus;
+            finalAmount: import("@prisma/client-runtime-utils").Decimal | null;
+            fulfilmentType: import("@prisma/client").$Enums.FulfilmentType | null;
+        } | null;
         quote: ({
             lineItems: {
                 id: string;
                 createdAt: Date;
-                quoteId: string;
                 sortOrder: number;
                 amount: import("@prisma/client-runtime-utils").Decimal;
+                quoteId: string;
                 label: string;
             }[];
         } & {
             id: string;
+            description: string | null;
+            vendorId: string;
+            isActive: boolean;
             createdAt: Date;
             updatedAt: Date;
-            isActive: boolean;
-            version: number;
-            vendorId: string;
-            status: import("@prisma/client").$Enums.QuoteStatus;
-            description: string | null;
-            conversationId: string | null;
-            bookingId: string | null;
-            clientId: string | null;
-            eventId: string | null;
             listingId: string | null;
+            clientId: string | null;
+            status: import("@prisma/client").$Enums.QuoteStatus;
             notes: string | null;
+            eventId: string | null;
+            bookingId: string | null;
             quoteNumber: string | null;
+            conversationId: string | null;
             amount: import("@prisma/client-runtime-utils").Decimal;
             paymentTerms: string | null;
             validUntil: Date;
+            version: number;
             parentQuoteId: string | null;
             isLocked: boolean;
             lockedAt: Date | null;
@@ -280,38 +274,29 @@ export declare class MessagingController {
             lineItems: {
                 id: string;
                 createdAt: Date;
-                invoiceId: string;
                 sortOrder: number;
                 amount: import("@prisma/client-runtime-utils").Decimal;
                 label: string;
+                invoiceId: string;
             }[];
         } & {
             id: string;
+            vendorId: string;
             createdAt: Date;
             updatedAt: Date;
-            vendorId: string;
+            listingId: string | null;
+            clientId: string;
             status: import("@prisma/client").$Enums.InvoiceStatus;
             total: import("@prisma/client-runtime-utils").Decimal;
+            notes: string | null;
+            eventId: string | null;
+            bookingId: string | null;
             conversationId: string;
             quoteId: string | null;
-            bookingId: string | null;
-            clientId: string;
-            eventId: string | null;
-            listingId: string | null;
-            notes: string | null;
             invoiceNumber: string;
             subtotal: import("@prisma/client-runtime-utils").Decimal;
             issuedAt: Date;
         }) | null;
-        booking: {
-            id: string;
-            status: import("@prisma/client").$Enums.BookingStatus;
-            listing: {
-                title: string;
-            };
-            finalAmount: import("@prisma/client-runtime-utils").Decimal | null;
-            fulfilmentType: import("@prisma/client").$Enums.FulfilmentType | null;
-        } | null;
         todo: ({
             assignments: {
                 id: string;
@@ -323,63 +308,78 @@ export declare class MessagingController {
             }[];
         } & {
             id: string;
+            title: string;
+            description: string | null;
             createdAt: Date;
             updatedAt: Date;
-            description: string | null;
-            title: string;
             conversationId: string;
             createdBy: string;
             dueAt: Date | null;
         }) | null;
-    } & {
-        metadata: import("@prisma/client/runtime/client").JsonValue | null;
-        type: import("@prisma/client").$Enums.MessageType;
-        id: string;
-        createdAt: Date;
-        content: string | null;
-        conversationId: string;
-        senderId: string;
-        voiceUrl: string | null;
-        voiceDuration: number | null;
-        quoteId: string | null;
-        invoiceId: string | null;
-        bookingId: string | null;
-        todoId: string | null;
-        isRead: boolean;
-        readAt: Date | null;
-    })[]>;
-    sendMessage(req: Request, id: string, dto: SendMessageDto): Promise<{
+        sender: {
+            id: string;
+            image: string | null;
+            name: string;
+        };
         attachments: {
-            url: string;
             id: string;
             createdAt: Date;
+            url: string;
             publicId: string | null;
             fileName: string | null;
             fileType: string;
             fileSize: number;
             messageId: string;
         }[];
-        sender: {
-            id: string;
-            name: string;
-            image: string | null;
-        };
     } & {
-        metadata: import("@prisma/client/runtime/client").JsonValue | null;
-        type: import("@prisma/client").$Enums.MessageType;
         id: string;
         createdAt: Date;
+        type: import("@prisma/client").$Enums.MessageType;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
         content: string | null;
-        conversationId: string;
-        senderId: string;
-        voiceUrl: string | null;
-        voiceDuration: number | null;
-        quoteId: string | null;
-        invoiceId: string | null;
-        bookingId: string | null;
-        todoId: string | null;
         isRead: boolean;
         readAt: Date | null;
+        bookingId: string | null;
+        conversationId: string;
+        quoteId: string | null;
+        invoiceId: string | null;
+        voiceUrl: string | null;
+        voiceDuration: number | null;
+        senderId: string;
+        todoId: string | null;
+    })[]>;
+    sendMessage(req: Request, id: string, dto: SendMessageDto): Promise<{
+        sender: {
+            id: string;
+            image: string | null;
+            name: string;
+        };
+        attachments: {
+            id: string;
+            createdAt: Date;
+            url: string;
+            publicId: string | null;
+            fileName: string | null;
+            fileType: string;
+            fileSize: number;
+            messageId: string;
+        }[];
+    } & {
+        id: string;
+        createdAt: Date;
+        type: import("@prisma/client").$Enums.MessageType;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+        content: string | null;
+        isRead: boolean;
+        readAt: Date | null;
+        bookingId: string | null;
+        conversationId: string;
+        quoteId: string | null;
+        invoiceId: string | null;
+        voiceUrl: string | null;
+        voiceDuration: number | null;
+        senderId: string;
+        todoId: string | null;
     }>;
     markRead(req: Request, id: string): Promise<{
         updated: number;
@@ -387,8 +387,8 @@ export declare class MessagingController {
     addParticipant(req: Request, id: string, userId: string): Promise<{
         id: string;
         userId: string;
-        conversationId: string;
         unreadCount: number;
+        conversationId: string;
         lastReadAt: Date | null;
         joinedAt: Date;
     } | {

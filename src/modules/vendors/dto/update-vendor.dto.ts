@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsInt,
@@ -12,7 +13,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { VendorBusinessType, VendorType } from '@prisma/client';
+import { EventType, VendorBusinessType, VendorType } from '@prisma/client';
 
 export class UpdateVendorDto {
   @ApiPropertyOptional({ type: 'string', example: 'Lagos Lights Photography' })
@@ -95,4 +96,15 @@ export class UpdateVendorDto {
   @ApiPropertyOptional({ type: [String], description: 'Portfolio image URLs' })
   @IsOptional()
   portfolioUrls?: string[];
+
+  @ApiPropertyOptional({
+    enum: EventType,
+    isArray: true,
+    example: [EventType.WEDDING, EventType.SOCIAL_PARTY],
+    description: 'Event types the vendor serves; empty = unspecified / serves all',
+  })
+  @IsArray()
+  @IsEnum(EventType, { each: true })
+  @IsOptional()
+  eventTypes?: EventType[];
 }

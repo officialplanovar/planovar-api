@@ -22,6 +22,7 @@ export const listingsSchema: CollectionCreateSchema = {
     { name: 'vendorName', type: 'string' },
     { name: 'vendorSlug', type: 'string' },
     { name: 'vendorTier', type: 'string', facet: true },
+    { name: 'vendorEventTypes', type: 'string[]', facet: true, optional: true },
     { name: 'vendorVerified', type: 'bool', optional: true },
     { name: 'rating', type: 'float' },
     { name: 'reviewCount', type: 'int32' },

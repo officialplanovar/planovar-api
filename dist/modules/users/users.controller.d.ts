@@ -6,24 +6,24 @@ export declare class UsersController {
     private readonly usersService;
     constructor(usersService: UsersService);
     getMe(req: Request): Promise<{
-        email: string;
         id: string;
-        createdAt: Date;
-        emailVerified: boolean;
-        name: string;
         image: string | null;
-        role: import("@prisma/client").$Enums.UserRole;
-        phone: string | null;
-        firstName: string | null;
-        lastName: string | null;
         isActive: boolean;
-        notificationPrefs: import("@prisma/client/runtime/client").JsonValue;
-        deletedAt: Date | null;
+        createdAt: Date;
+        name: string;
         vendorProfile: {
             id: string;
-            kycStatus: import("@prisma/client").$Enums.KycStatus;
             subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
         } | null;
+        phone: string | null;
+        email: string;
+        emailVerified: boolean;
+        role: import("@prisma/client").$Enums.UserRole;
+        firstName: string | null;
+        lastName: string | null;
+        notificationPrefs: import("@prisma/client/runtime/client").JsonValue;
+        deletedAt: Date | null;
         clientProfile: {
             id: string;
             onboardingComplete: boolean;
@@ -53,24 +53,24 @@ export declare class UsersController {
         } | null;
     }>;
     updateMe(req: Request, dto: UpdateProfileDto): Promise<{
-        email: string;
         id: string;
-        createdAt: Date;
-        emailVerified: boolean;
-        name: string;
         image: string | null;
-        role: import("@prisma/client").$Enums.UserRole;
-        phone: string | null;
-        firstName: string | null;
-        lastName: string | null;
         isActive: boolean;
-        notificationPrefs: import("@prisma/client/runtime/client").JsonValue;
-        deletedAt: Date | null;
+        createdAt: Date;
+        name: string;
         vendorProfile: {
             id: string;
-            kycStatus: import("@prisma/client").$Enums.KycStatus;
             subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
         } | null;
+        phone: string | null;
+        email: string;
+        emailVerified: boolean;
+        role: import("@prisma/client").$Enums.UserRole;
+        firstName: string | null;
+        lastName: string | null;
+        notificationPrefs: import("@prisma/client/runtime/client").JsonValue;
+        deletedAt: Date | null;
         clientProfile: {
             id: string;
             onboardingComplete: boolean;
@@ -100,24 +100,24 @@ export declare class UsersController {
         } | null;
     }>;
     setPreferences(req: Request, dto: SetPreferencesDto): Promise<{
-        email: string;
         id: string;
-        createdAt: Date;
-        emailVerified: boolean;
-        name: string;
         image: string | null;
-        role: import("@prisma/client").$Enums.UserRole;
-        phone: string | null;
-        firstName: string | null;
-        lastName: string | null;
         isActive: boolean;
-        notificationPrefs: import("@prisma/client/runtime/client").JsonValue;
-        deletedAt: Date | null;
+        createdAt: Date;
+        name: string;
         vendorProfile: {
             id: string;
-            kycStatus: import("@prisma/client").$Enums.KycStatus;
             subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
+            kycStatus: import("@prisma/client").$Enums.KycStatus;
         } | null;
+        phone: string | null;
+        email: string;
+        emailVerified: boolean;
+        role: import("@prisma/client").$Enums.UserRole;
+        firstName: string | null;
+        lastName: string | null;
+        notificationPrefs: import("@prisma/client/runtime/client").JsonValue;
+        deletedAt: Date | null;
         clientProfile: {
             id: string;
             onboardingComplete: boolean;
@@ -164,46 +164,46 @@ export declare class UsersController {
     }>;
     listFavourites(req: Request): Promise<{
         listing: {
-            id: string;
-            isActive: boolean;
             vendor: {
                 id: string;
-                businessName: string;
                 slug: string;
                 subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
                 isVerified: boolean;
+                businessName: string;
             };
-            tags: string[];
-            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
-            reviewCount: number;
+            id: string;
             title: string;
+            pricingType: import("@prisma/client").$Enums.PricingType;
+            tags: string[];
+            reviewCount: number;
+            isActive: boolean;
+            ratingAvg: import("@prisma/client-runtime-utils").Decimal;
+            basePrice: import("@prisma/client-runtime-utils").Decimal | null;
             category: {
                 id: string;
                 name: string;
                 slug: string;
             };
-            pricingType: import("@prisma/client").$Enums.PricingType;
-            basePrice: import("@prisma/client-runtime-utils").Decimal | null;
             media: {
-                url: string;
-                type: import("@prisma/client").$Enums.MediaType;
                 id: string;
+                type: import("@prisma/client").$Enums.MediaType;
+                url: string;
             }[];
         };
     }[]>;
     listVendorFavourites(req: Request): Promise<({
         id: string;
-        tags: string[];
-        businessName: string;
-        slug: string;
         description: string | null;
-        logoUrl: string | null;
-        coverUrl: string | null;
+        tags: string[];
         location: import("@prisma/client/runtime/client").JsonValue;
-        ratingAvg: import("@prisma/client-runtime-utils").Decimal;
         reviewCount: number;
+        ratingAvg: import("@prisma/client-runtime-utils").Decimal;
+        slug: string;
         subscriptionTier: import("@prisma/client").$Enums.SubscriptionTier;
         isVerified: boolean;
+        coverUrl: string | null;
+        businessName: string;
+        logoUrl: string | null;
     } | undefined)[]>;
     addVendorFavourite(req: Request, vendorId: string): Promise<{
         favourited: boolean;

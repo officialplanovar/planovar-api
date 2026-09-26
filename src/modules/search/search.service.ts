@@ -35,6 +35,7 @@ export interface ListingFilters {
   city?: string;
   country?: string;
   isRentable?: boolean;
+  eventType?: string;
 }
 
 export interface VendorFilters {
@@ -42,6 +43,7 @@ export interface VendorFilters {
   city?: string;
   country?: string;
   isVerified?: boolean;
+  eventType?: string;
 }
 
 export interface EventFilters {
@@ -165,6 +167,11 @@ export class SearchService {
       if (filters.isRentable != null) {
         filterParts.push(`isRentable:=${filters.isRentable}`);
       }
+      if (filters.eventType) {
+        // Vendors with no declared event types are indexed with the full set,
+        // so this also matches "serves all" vendors.
+        filterParts.push(`vendorEventTypes:=[${filters.eventType}]`);
+      }
 
       const hasQuery = !!query && query.trim().length > 0;
       const sortBy = hasQuery
@@ -238,6 +245,11 @@ export class SearchService {
       }
       if (filters.country) {
         filterParts.push(`country:=${filters.country}`);
+      }
+      if (filters.eventType) {
+        // Vendors with no declared event types are indexed with the full set,
+        // so this also matches "serves all" vendors.
+        filterParts.push(`event_types:=[${filters.eventType}]`);
       }
 
       const hasQuery = !!query && query.trim().length > 0;

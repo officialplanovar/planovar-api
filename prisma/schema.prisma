@@ -30,13 +30,10 @@ enum MediaType {
 
 enum EventType {
   WEDDING
+  FUNERAL
   BIRTHDAY
-  ANNIVERSARY
   CORPORATE
-  CONCERT
-  BURIAL
-  GRADUATION
-  CONFERENCE
+  SOCIAL_PARTY
   OTHER
 }
 
@@ -365,6 +362,7 @@ model VendorProfile {
   vendorType             VendorType          @default(BOTH) @map("vendor_type")
   location               Json
   serviceRadiusKm        Int?                @map("service_radius_km")
+  eventTypes             EventType[]         @default([]) @map("event_types") // event types the vendor serves; empty = unspecified / all
   tags                   String[]
   ratingAvg              Decimal             @default(0) @map("rating_avg") @db.Decimal(3, 2)
   reviewCount            Int                 @default(0) @map("review_count")

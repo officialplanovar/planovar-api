@@ -5,13 +5,13 @@ export declare class NotificationsController {
     constructor(notificationsService: NotificationsService);
     list(req: Request, take?: string, skip?: string): Promise<{
         data: {
-            body: string;
-            type: import("@prisma/client").$Enums.NotificationType;
             id: string;
+            title: string;
             createdAt: Date;
+            type: import("@prisma/client").$Enums.NotificationType;
             userId: string;
             data: import("@prisma/client/runtime/client").JsonValue | null;
-            title: string;
+            body: string;
             isRead: boolean;
             readAt: Date | null;
         }[];
@@ -27,13 +27,13 @@ export declare class NotificationsController {
         count: number;
     }>;
     markRead(req: Request, id: string): Promise<{
-        body: string;
-        type: import("@prisma/client").$Enums.NotificationType;
         id: string;
+        title: string;
         createdAt: Date;
+        type: import("@prisma/client").$Enums.NotificationType;
         userId: string;
         data: import("@prisma/client/runtime/client").JsonValue | null;
-        title: string;
+        body: string;
         isRead: boolean;
         readAt: Date | null;
     }>;

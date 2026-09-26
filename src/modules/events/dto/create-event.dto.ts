@@ -1,10 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { EventType } from '@prisma/client';
+import {
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateEventDto {
-  @ApiProperty({ type: 'string', example: 'Adaeze & Chukwuemeka Wedding' })
+  @ApiProperty({ type: 'string', example: 'Zoe & Michael Wedding' })
   @IsString()
   title: string;
+
+  @ApiPropertyOptional({ enum: EventType, enumName: 'EventType', example: 'WEDDING' })
+  @IsEnum(EventType)
+  @IsOptional()
+  type?: EventType;
 
   @ApiPropertyOptional({ type: 'string', example: 'A celebration of love and culture' })
   @IsString()

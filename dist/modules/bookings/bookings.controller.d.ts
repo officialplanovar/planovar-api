@@ -6,15 +6,13 @@ export declare class BookingsController {
     constructor(bookingsService: BookingsService);
     create(req: Request, dto: CreateBookingDto): Promise<{
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -24,12 +22,14 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     }>;
     findAll(req: Request, status?: string, take?: string, skip?: string): Promise<({
         client: {
-            email: string;
             id: string;
             name: string;
+            email: string;
         };
         listing: {
             id: string;
@@ -37,15 +37,13 @@ export declare class BookingsController {
         };
     } & {
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -55,11 +53,13 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     })[] | ({
         vendor: {
             id: string;
-            businessName: string;
             slug: string;
+            businessName: string;
         };
         listing: {
             id: string;
@@ -67,15 +67,13 @@ export declare class BookingsController {
         };
     } & {
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -85,50 +83,56 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     })[]>;
     inboxSummary(req: Request): Promise<{
         actionNeeded: number;
     }>;
     findOne(req: Request, id: string): Promise<{
         client: {
-            email: string;
             id: string;
             name: string;
+            email: string;
         };
         vendor: {
             id: string;
+            slug: string;
             userId: string;
             businessName: string;
-            slug: string;
+        };
+        listing: {
+            id: string;
+            title: string;
         };
         quotes: ({
             lineItems: {
                 id: string;
                 createdAt: Date;
-                quoteId: string;
                 sortOrder: number;
                 amount: import("@prisma/client-runtime-utils").Decimal;
+                quoteId: string;
                 label: string;
             }[];
         } & {
             id: string;
+            description: string | null;
+            vendorId: string;
+            isActive: boolean;
             createdAt: Date;
             updatedAt: Date;
-            isActive: boolean;
-            version: number;
-            vendorId: string;
-            status: import("@prisma/client").$Enums.QuoteStatus;
-            description: string | null;
-            conversationId: string | null;
-            bookingId: string | null;
-            clientId: string | null;
-            eventId: string | null;
             listingId: string | null;
+            clientId: string | null;
+            status: import("@prisma/client").$Enums.QuoteStatus;
             notes: string | null;
+            eventId: string | null;
+            bookingId: string | null;
             quoteNumber: string | null;
+            conversationId: string | null;
             amount: import("@prisma/client-runtime-utils").Decimal;
             paymentTerms: string | null;
             validUntil: Date;
+            version: number;
             parentQuoteId: string | null;
             isLocked: boolean;
             lockedAt: Date | null;
@@ -137,53 +141,47 @@ export declare class BookingsController {
             lineItems: {
                 id: string;
                 createdAt: Date;
-                invoiceId: string;
                 sortOrder: number;
                 amount: import("@prisma/client-runtime-utils").Decimal;
                 label: string;
+                invoiceId: string;
             }[];
         } & {
             id: string;
+            vendorId: string;
             createdAt: Date;
             updatedAt: Date;
-            vendorId: string;
+            listingId: string | null;
+            clientId: string;
             status: import("@prisma/client").$Enums.InvoiceStatus;
             total: import("@prisma/client-runtime-utils").Decimal;
+            notes: string | null;
+            eventId: string | null;
+            bookingId: string | null;
             conversationId: string;
             quoteId: string | null;
-            bookingId: string | null;
-            clientId: string;
-            eventId: string | null;
-            listingId: string | null;
-            notes: string | null;
             invoiceNumber: string;
             subtotal: import("@prisma/client-runtime-utils").Decimal;
             issuedAt: Date;
         }) | null;
-        listing: {
-            id: string;
-            title: string;
-        };
         statusHistory: {
             id: string;
             createdAt: Date;
             reason: string | null;
-            bookingId: string;
             fromStatus: import("@prisma/client").$Enums.BookingStatus | null;
             toStatus: import("@prisma/client").$Enums.BookingStatus;
             changedBy: string;
+            bookingId: string;
         }[];
     } & {
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -193,18 +191,18 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     }>;
     confirm(req: Request, id: string): Promise<{
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -214,18 +212,18 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     }>;
     reject(req: Request, id: string, reason?: string): Promise<{
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -235,18 +233,18 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     }>;
     cancel(req: Request, id: string): Promise<{
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -256,18 +254,18 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     }>;
     complete(req: Request, id: string): Promise<{
         id: string;
+        vendorId: string;
         createdAt: Date;
         updatedAt: Date;
-        vendorId: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        clientId: string;
-        eventId: string | null;
         listingId: string;
         eventDate: Date;
-        packageId: string | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.BookingStatus;
         eventLocation: import("@prisma/client/runtime/client").JsonValue;
         requirements: string | null;
         quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
@@ -277,5 +275,7 @@ export declare class BookingsController {
         pickupAt: Date | null;
         returnAt: Date | null;
         notes: string | null;
+        packageId: string | null;
+        eventId: string | null;
     }>;
 }

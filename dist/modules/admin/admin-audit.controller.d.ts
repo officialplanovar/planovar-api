@@ -6,19 +6,19 @@ export declare class AdminAuditController {
     list(query: AuditQueryDto): Promise<{
         data: ({
             user: {
-                email: string;
                 id: string;
                 name: string;
+                email: string;
             } | null;
         } & {
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             id: string;
             createdAt: Date;
+            metadata: import("@prisma/client/runtime/client").JsonValue | null;
             userId: string | null;
-            ipAddress: string | null;
             action: string;
             resourceType: string;
             resourceId: string | null;
+            ipAddress: string | null;
         })[];
         meta: {
             total: number;

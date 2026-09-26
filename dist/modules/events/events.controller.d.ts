@@ -6,148 +6,148 @@ export declare class EventsController {
     private readonly eventsService;
     constructor(eventsService: EventsService);
     create(req: Request, dto: CreateEventDto): Promise<{
-        type: import("@prisma/client").$Enums.EventType;
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        name: string;
-        status: import("@prisma/client").$Enums.EventStatus;
         description: string | null;
-        coverUrl: string | null;
         location: import("@prisma/client/runtime/client").JsonValue | null;
-        clientId: string;
+        createdAt: Date;
+        name: string;
+        type: import("@prisma/client").$Enums.EventType;
+        coverUrl: string | null;
+        updatedAt: Date;
         eventDate: Date;
-        guestCount: number | null;
-        durationHours: number | null;
         budgetMin: import("@prisma/client-runtime-utils").Decimal | null;
         budgetMax: import("@prisma/client-runtime-utils").Decimal | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.EventStatus;
+        guestCount: number | null;
+        durationHours: number | null;
     }>;
     findAll(req: Request): Promise<{
         id: string;
+        location: import("@prisma/client/runtime/client").JsonValue;
         createdAt: Date;
         name: string;
-        _count: {
-            eventVendors: number;
-        };
-        status: import("@prisma/client").$Enums.EventStatus;
         coverUrl: string | null;
-        location: import("@prisma/client/runtime/client").JsonValue;
         eventListings: {
             listingId: string;
         }[];
+        _count: {
+            eventVendors: number;
+        };
         eventDate: Date;
-        guestCount: number | null;
         budgetMin: import("@prisma/client-runtime-utils").Decimal | null;
         budgetMax: import("@prisma/client-runtime-utils").Decimal | null;
+        status: import("@prisma/client").$Enums.EventStatus;
+        guestCount: number | null;
     }[]>;
     findOne(req: Request, id: string): Promise<{
         bookings: {
             id: string;
-            status: import("@prisma/client").$Enums.BookingStatus;
             eventDate: Date;
+            status: import("@prisma/client").$Enums.BookingStatus;
             quoteAmount: import("@prisma/client-runtime-utils").Decimal | null;
         }[];
-        eventVendors: ({
-            vendor: {
-                id: string;
-                businessName: string;
-                slug: string;
-                logoUrl: string | null;
-                coverUrl: string | null;
-            };
-        } & {
-            id: string;
-            vendorId: string;
-            bookingId: string | null;
-            eventId: string;
-            addedAt: Date;
-        })[];
         eventListings: ({
             listing: {
                 id: string;
-                vendorId: string;
-                ratingAvg: import("@prisma/client-runtime-utils").Decimal;
-                reviewCount: number;
                 title: string;
                 pricingType: import("@prisma/client").$Enums.PricingType;
-                basePrice: import("@prisma/client-runtime-utils").Decimal | null;
+                vendorId: string;
+                reviewCount: number;
                 isRentable: boolean;
+                ratingAvg: import("@prisma/client-runtime-utils").Decimal;
+                basePrice: import("@prisma/client-runtime-utils").Decimal | null;
                 media: {
                     url: string;
                 }[];
             };
         } & {
             id: string;
-            eventId: string;
             listingId: string;
+            eventId: string;
+            addedAt: Date;
+        })[];
+        eventVendors: ({
+            vendor: {
+                id: string;
+                slug: string;
+                coverUrl: string | null;
+                businessName: string;
+                logoUrl: string | null;
+            };
+        } & {
+            id: string;
+            vendorId: string;
+            eventId: string;
+            bookingId: string | null;
             addedAt: Date;
         })[];
         groupConversation: {
             id: string;
         } | null;
     } & {
-        type: import("@prisma/client").$Enums.EventType;
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        name: string;
-        status: import("@prisma/client").$Enums.EventStatus;
         description: string | null;
-        coverUrl: string | null;
         location: import("@prisma/client/runtime/client").JsonValue | null;
-        clientId: string;
+        createdAt: Date;
+        name: string;
+        type: import("@prisma/client").$Enums.EventType;
+        coverUrl: string | null;
+        updatedAt: Date;
         eventDate: Date;
-        guestCount: number | null;
-        durationHours: number | null;
         budgetMin: import("@prisma/client-runtime-utils").Decimal | null;
         budgetMax: import("@prisma/client-runtime-utils").Decimal | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.EventStatus;
+        guestCount: number | null;
+        durationHours: number | null;
     }>;
     update(req: Request, id: string, dto: UpdateEventDto): Promise<{
-        type: import("@prisma/client").$Enums.EventType;
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        name: string;
-        status: import("@prisma/client").$Enums.EventStatus;
         description: string | null;
-        coverUrl: string | null;
         location: import("@prisma/client/runtime/client").JsonValue | null;
-        clientId: string;
+        createdAt: Date;
+        name: string;
+        type: import("@prisma/client").$Enums.EventType;
+        coverUrl: string | null;
+        updatedAt: Date;
         eventDate: Date;
-        guestCount: number | null;
-        durationHours: number | null;
         budgetMin: import("@prisma/client-runtime-utils").Decimal | null;
         budgetMax: import("@prisma/client-runtime-utils").Decimal | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.EventStatus;
+        guestCount: number | null;
+        durationHours: number | null;
     }>;
     cancel(req: Request, id: string): Promise<{
-        type: import("@prisma/client").$Enums.EventType;
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        name: string;
-        status: import("@prisma/client").$Enums.EventStatus;
         description: string | null;
-        coverUrl: string | null;
         location: import("@prisma/client/runtime/client").JsonValue | null;
-        clientId: string;
+        createdAt: Date;
+        name: string;
+        type: import("@prisma/client").$Enums.EventType;
+        coverUrl: string | null;
+        updatedAt: Date;
         eventDate: Date;
-        guestCount: number | null;
-        durationHours: number | null;
         budgetMin: import("@prisma/client-runtime-utils").Decimal | null;
         budgetMax: import("@prisma/client-runtime-utils").Decimal | null;
+        clientId: string;
+        status: import("@prisma/client").$Enums.EventStatus;
+        guestCount: number | null;
+        durationHours: number | null;
     }>;
     addVendor(req: Request, id: string, vendorId: string): Promise<{
         id: string;
         vendorId: string;
-        bookingId: string | null;
         eventId: string;
+        bookingId: string | null;
         addedAt: Date;
     }>;
     removeVendor(req: Request, id: string, vendorId: string): Promise<{
         id: string;
         vendorId: string;
-        bookingId: string | null;
         eventId: string;
+        bookingId: string | null;
         addedAt: Date;
     }>;
     addListing(req: Request, id: string, listingId: string): Promise<{
