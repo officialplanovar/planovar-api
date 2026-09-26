@@ -330,7 +330,8 @@ export class VendorsService {
 
   // ─── KYC ─────────────────────────────────────────────────────────────────
 
-  /** Vendor submits NIN (+ CAC for licensed businesses) for verification. */
+  /** Vendor submits a government ID (+ business registration for registered
+   *  businesses) for verification. Global, document-only. */
   async submitKyc(userId: string, dto: SubmitKycDto) {
     const vendor = await this.prisma.vendorProfile.findUnique({
       where: { userId },
@@ -338,15 +339,20 @@ export class VendorsService {
     });
     if (!vendor) throw new NotFoundException('Vendor profile not found — onboard first');
 
-    if (vendor.businessType === 'LICENSED' && !dto.cacDocumentUrl) {
-      throw new BadRequestException('CAC document is required for licensed businesses');
+    if (vendor.businessType === 'LICENSED' && !dto.businessRegDocumentUrl) {
+      throw new BadRequestException(
+        'A business registration document is required for registered businesses',
+      );
     }
 
     const updated = await this.prisma.vendorProfile.update({
       where: { id: vendor.id },
       data: {
-        ninDocumentUrl: dto.ninDocumentUrl,
-        cacDocumentUrl: dto.cacDocumentUrl ?? null,
+        idDocumentUrl: dto.idDocumentUrl,
+        idType: dto.idType,
+        idCountry: dto.idCountry,
+        businessRegDocumentUrl: dto.businessRegDocumentUrl ?? null,
+        businessRegCountry: dto.businessRegCountry ?? null,
         kycStatus: KycStatus.SUBMITTED,
         kycSubmittedAt: new Date(),
         kycRejectionReason: null,
@@ -372,8 +378,11 @@ export class VendorsService {
         slug: true,
         businessType: true,
         location: true,
-        ninDocumentUrl: true,
-        cacDocumentUrl: true,
+        idDocumentUrl: true,
+        idType: true,
+        idCountry: true,
+        businessRegDocumentUrl: true,
+        businessRegCountry: true,
         kycSubmittedAt: true,
       },
     });
@@ -457,8 +466,11 @@ export class VendorsService {
   private buildOwnerSelect() {
     return {
       ...this.buildVendorSelect(),
-      ninDocumentUrl: true,
-      cacDocumentUrl: true,
+      idDocumentUrl: true,
+      idType: true,
+      idCountry: true,
+      businessRegDocumentUrl: true,
+      businessRegCountry: true,
       kycSubmittedAt: true,
       kycReviewedAt: true,
       kycRejectionReason: true,

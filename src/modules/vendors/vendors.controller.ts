@@ -68,7 +68,8 @@ export class VendorsController {
   @UseGuards(SessionAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Submit KYC documents (NIN, + CAC for licensed businesses) for verification',
+    summary:
+      'Submit KYC documents (government ID, + business registration for registered businesses) for verification',
   })
   submitKyc(@Req() req: Request, @Body() dto: SubmitKycDto) {
     return this.vendorsService.submitKyc((req as any).user.id, dto);

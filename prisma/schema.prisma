@@ -86,7 +86,7 @@ enum BillingCycle {
 }
 
 enum VendorBusinessType {
-  LICENSED // registered/licensed business (CAC)
+  LICENSED // registered/licensed business (any country)
   FREELANCER // individual / sole operator
 }
 
@@ -351,35 +351,40 @@ model Verification {
 // ─────────────────────────────────────────────
 
 model VendorProfile {
-  id                 String              @id @default(uuid()) @db.Uuid
-  userId             String              @unique @map("user_id") // FK → user.id (text)
-  businessName       String              @map("business_name")
-  slug               String              @unique
-  description        String?
-  logoUrl            String?             @map("logo_url")
-  coverUrl           String?             @map("cover_url")
-  portfolioUrls      String[]            @map("portfolio_urls") // additional gallery images
-  phone              String?
-  email              String?
-  businessType       VendorBusinessType? @map("business_type")
-  vendorType         VendorType          @default(BOTH) @map("vendor_type")
-  location           Json
-  serviceRadiusKm    Int?                @map("service_radius_km")
-  tags               String[]
-  ratingAvg          Decimal             @default(0) @map("rating_avg") @db.Decimal(3, 2)
-  reviewCount        Int                 @default(0) @map("review_count")
-  subscriptionTier   SubscriptionTier    @default(BASIC) @map("subscription_tier")
-  // ─── KYC / verification (KYC at signup; CAC for licensed vendors — MoM #11–12) ───
-  kycStatus          KycStatus           @default(NOT_SUBMITTED) @map("kyc_status")
-  ninDocumentUrl     String?             @map("nin_document_url")
-  cacDocumentUrl     String?             @map("cac_document_url")
-  kycSubmittedAt     DateTime?           @map("kyc_submitted_at")
-  kycReviewedAt      DateTime?           @map("kyc_reviewed_at")
-  kycReviewedBy      String?             @map("kyc_reviewed_by") // admin user.id
-  kycRejectionReason String?             @map("kyc_rejection_reason")
-  isVerified         Boolean             @default(false) @map("is_verified")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
+  id                     String              @id @default(uuid()) @db.Uuid
+  userId                 String              @unique @map("user_id") // FK → user.id (text)
+  businessName           String              @map("business_name")
+  slug                   String              @unique
+  description            String?
+  logoUrl                String?             @map("logo_url")
+  coverUrl               String?             @map("cover_url")
+  portfolioUrls          String[]            @map("portfolio_urls") // additional gallery images
+  phone                  String?
+  email                  String?
+  businessType           VendorBusinessType? @map("business_type")
+  vendorType             VendorType          @default(BOTH) @map("vendor_type")
+  location               Json
+  serviceRadiusKm        Int?                @map("service_radius_km")
+  tags                   String[]
+  ratingAvg              Decimal             @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  reviewCount            Int                 @default(0) @map("review_count")
+  subscriptionTier       SubscriptionTier    @default(BASIC) @map("subscription_tier")
+  // ─── KYC / KYB verification (global, document-only; manual admin review) ───
+  // Government-issued ID for every vendor; a business registration document for
+  // registered/licensed businesses. Document-only — no biometric/face verification.
+  kycStatus              KycStatus           @default(NOT_SUBMITTED) @map("kyc_status")
+  idDocumentUrl          String?             @map("id_document_url")
+  idType                 String?             @map("id_type") // 'passport' | 'national_id' | 'drivers_license'
+  idCountry              String?             @map("id_country")
+  businessRegDocumentUrl String?             @map("business_reg_document_url")
+  businessRegCountry     String?             @map("business_reg_country")
+  kycSubmittedAt         DateTime?           @map("kyc_submitted_at")
+  kycReviewedAt          DateTime?           @map("kyc_reviewed_at")
+  kycReviewedBy          String?             @map("kyc_reviewed_by") // admin user.id
+  kycRejectionReason     String?             @map("kyc_rejection_reason")
+  isVerified             Boolean             @default(false) @map("is_verified")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
 
   user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   listings              Listing[]
