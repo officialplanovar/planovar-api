@@ -804,6 +804,13 @@ model VendorSubscription {
   // Provider-agnostic billing (src/modules/billing): stripe | paystack | paypal | iap
   provider               String?
   providerSubscriptionId String?            @map("provider_subscription_id")
+  // Apple/Google in-app-purchase linkage (provider = 'apple' | 'google').
+  // iapOriginalTxnId is the STABLE key that renewal/expiry store notifications
+  // carry (Apple originalTransactionId / Google purchase token), used to match a
+  // webhook back to this subscription. Null for web (Stripe/Paystack) subs.
+  iapPlatform            String?            @map("iap_platform")
+  iapProductId           String?            @map("iap_product_id")
+  iapOriginalTxnId       String?            @map("iap_original_txn_id")
   cancelledAt            DateTime?          @map("cancelled_at")
   createdAt              DateTime           @default(now()) @map("created_at")
   updatedAt              DateTime           @updatedAt @map("updated_at")
@@ -814,6 +821,7 @@ model VendorSubscription {
   @@index([vendorId])
   @@index([status])
   @@index([providerSubscriptionId])
+  @@index([iapOriginalTxnId])
   @@map("vendor_subscriptions")
 }
 
