@@ -356,8 +356,8 @@ const SUBSCRIPTION_PLANS = [
   {
     tier: 'PREMIUM' as const,
     name: 'Premium',
-    priceMonthly: 19.99,
-    priceYearly: 199.99,
+    priceMonthly: 24.99,
+    priceYearly: 249.99,
     currency: 'USD',
     listingLimit: 5,
     features: [
