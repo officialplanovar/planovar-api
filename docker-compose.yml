@@ -10,7 +10,14 @@ services:
       - '5434:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Creates the `planovar_shadow` DB (needed by `prisma migrate dev`) on fresh volumes.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d planovar_dev']
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   redis:
     image: redis:7-alpine
@@ -20,6 +27,11 @@ services:
     volumes:
       - redisdata:/data
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   typesense:
     image: typesense/typesense:26.0

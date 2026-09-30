@@ -1,25 +1,68 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { injectBetterAuthPaths } from './auth/better-auth.swagger';
+import { getCorsOrigins } from './common/cors';
+
+// Log stray async errors but DON'T exit — a single unhandled rejection (a Redis
+// blip, a fire-and-forget index/webhook call) must not take the whole API down.
+// Killing the process here causes Railway to restart it, and requests during the
+// restart window fail with no CORS headers → browsers report them as CORS errors.
+// Genuine boot failures are still fatal via bootstrap().catch() below.
+process.on('uncaughtException', (err) => {
+  console.error('uncaughtException (logged, not fatal):', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('unhandledRejection (logged, not fatal):', err);
+});
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
+
+  // Static branding assets (logos for emails etc.) — served at /branding/*.
+  // Files live in planovar-api/public/branding/ (see the README there).
+  app.useStaticAssets(join(process.cwd(), 'public'), {
+    maxAge: '7d',
+  });
+
+  // ── Request logging (concise; disabled in production) ────────────────────
+  // Logs every request — including Better Auth (/api/auth/*) and webhooks — with
+  // method, path, status and duration. Set LOG_REQUESTS=false to silence.
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.LOG_REQUESTS !== 'false'
+  ) {
+    const httpLogger = new Logger('HTTP');
+    app.use((req: any, res: any, next: () => void) => {
+      const start = Date.now();
+      res.on('finish', () => {
+        const ms = Date.now() - start;
+        httpLogger.log(
+          `${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`,
+        );
+      });
+      next();
+    });
+  }
 
   // Global input validation — strips unknown fields, throws on bad data.
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
   );
 
-  // CORS — Flutter web and admin console origins.
+  // CORS — Flutter web and admin console origins (shared with the WS gateway).
+  // Extra origins can be supplied via CORS_ORIGINS (comma-separated).
   app.enableCors({
-    origin: [
-      'http://localhost:3001', // Flutter client web (dev)
-      'http://localhost:3002', // Flutter vendor web (dev)
-      'http://localhost:3003', // Admin console (dev)
-    ],
+    origin: getCorsOrigins(),
     credentials: true, // required for Better Auth session cookies
+    // Expose the Better Auth bearer token so browser SPAs (admin console) can
+    // read it from the response and store it for Authorization headers.
+    exposedHeaders: ['set-auth-token'],
   });
 
   // Swagger — available in dev/staging only.
@@ -56,12 +99,25 @@ async function bootstrap() {
     });
   }
 
+  // Drain in-flight requests and close DB/Redis connections on SIGTERM/SIGINT
+  // (Railway/Docker send SIGTERM on redeploy). Without this, PrismaService /
+  // RedisService onModuleDestroy never fires and connections leak on every deploy.
+  app.enableShutdownHooks();
+
   const port = process.env.PORT ?? 3000;
-  await app.listen(port);
-  console.log(`API running on http://localhost:${port}`);
+  // Bind to 0.0.0.0 (per Railway docs) — the default bind can leave the edge
+  // proxy unable to reach the app, causing "connection dial timeout" 502s.
+  await app.listen(port, '0.0.0.0');
+  console.log(`API running on 0.0.0.0:${port}`);
   if (process.env.NODE_ENV !== 'production') {
     console.log(`Swagger docs → http://localhost:${port}/docs`);
   }
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  // Make boot failures loud — otherwise the container exits silently and Railway
+  // just reports a 502 with no clue why.
+  console.error('FATAL: API failed to start');
+  console.error(err);
+  process.exit(1);
+});

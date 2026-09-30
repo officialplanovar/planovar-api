@@ -1,13 +1,79 @@
 import 'dotenv/config'; // must load before anything reads process.env
 import { betterAuth } from 'better-auth';
+import { APIError } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { emailOTP } from 'better-auth/plugins';
+import { bearer, emailOTP, twoFactor } from 'better-auth/plugins';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { Resend } from 'resend';
+import { emailTemplates } from '../common/email/templates';
 
 // Prisma 7 uses a driver adapter instead of embedding the URL in the schema.
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
+
+/**
+ * Normalize a phone number to canonical E.164 for the global platform.
+ * Planovar is worldwide, so a number is NOT assumed to be Nigerian: any number
+ * that includes a country code (leading `+`) is preserved as `+<digits>`, and a
+ * bare number with no dial code is only minimally normalized to its digits —
+ * we do NOT inject a `+234` (or any) country code. The apps always prepend the
+ * selected country's dial code, so submitted numbers should already carry `+`.
+ * Preserving one canonical form still keeps the `phone @unique` anti-dup
+ * constraint from being sidestepped by formatting. Empty → null.
+ */
+export function normalizePhone(raw?: string | null): string | null {
+  if (!raw) return null;
+  const hasPlus = raw.trim().startsWith('+');
+  const digits = raw.replace(/\D/g, ''); // keep digits only
+  if (digits.length === 0) return null;
+  // International number as entered (dial code included, e.g. +1, +44, +234):
+  // preserve it in canonical E.164 form.
+  if (hasPlus) return `+${digits}`;
+  // Bare number with no country code → cannot assume a region on a global
+  // platform. Return the digits as entered (minimal normalization); do not
+  // prefix any dial code.
+  return digits;
+}
+
+// ── Email OTP delivery (Resend, branded templates) ─────────────────────────
+// auth.config runs outside Nest DI, so we use Resend directly here. Falls back
+// to console logging in dev when RESEND_API_KEY is unset.
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+const EMAIL_FROM = process.env.EMAIL_FROM ?? 'noreply@planovar.ng';
+
+async function deliverOtp(email: string, otp: string, type: string) {
+  // Always log in dev so the flow is testable without checking an inbox.
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[OTP] ${type} → ${email}: ${otp}`);
+  }
+  if (!resend) return;
+  const purpose =
+    type === 'sign-in' ? 'login' : type === 'forget-password' ? 'reset' : 'verify';
+  const { subject, html } = emailTemplates.otp(otp, purpose);
+  await resend.emails.send({ from: EMAIL_FROM, to: email, subject, html });
+}
+
+// ── Social providers — only enabled when their credentials are configured ──
+const socialProviders: Record<string, unknown> = {};
+if (process.env.GOOGLE_CLIENT_ID) {
+  socialProviders.google = {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+  };
+}
+if (process.env.APPLE_SERVICE_ID && process.env.APPLE_CLIENT_SECRET) {
+  socialProviders.apple = {
+    clientId: process.env.APPLE_SERVICE_ID,
+    clientSecret: process.env.APPLE_CLIENT_SECRET,
+    // For native iOS sign-in, Better Auth validates against the app bundle id.
+    ...(process.env.APPLE_APP_BUNDLE_ID && {
+      appBundleIdentifier: process.env.APPLE_APP_BUNDLE_ID,
+    }),
+  };
+}
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -21,11 +87,48 @@ export const auth = betterAuth({
     'http://localhost:3000', // Swagger UI / API itself
     'http://localhost:3001', // Flutter client web
     'http://localhost:3002', // Flutter vendor web
-    'http://localhost:3003', // Admin console
+    'http://localhost:3003', // Admin console (default Next port)
+    'http://localhost:3004', // Admin console (documented port)
+    ...(process.env.TRUSTED_ORIGINS ?? '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
   ],
 
   // ── Secret (used to sign sessions) ─────────────────────────────────────
-  secret: process.env.BETTER_AUTH_SECRET ?? 'change-me-in-production',
+  // SECURITY: never fall back to a hardcoded secret in production — a public
+  // signing secret lets anyone forge session tokens for any user (incl. ADMIN).
+  // Fail fast at boot if it isn't set; a fixed dev-only value keeps local dev
+  // frictionless.
+  secret: (() => {
+    const s = process.env.BETTER_AUTH_SECRET?.trim();
+    if (s) return s;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'BETTER_AUTH_SECRET is required in production (used to sign sessions). Set it and restart.',
+      );
+    }
+    return 'dev-only-insecure-secret-do-not-use-in-prod';
+  })(),
+
+  // ── Rate limiting (brute-force protection for auth/OTP) ─────────────────
+  // Better Auth's built-in, per-path limiter. Without this the 6-digit email
+  // OTP (10-min TTL) is brute-forceable. Values are per-IP; kept generous
+  // enough to tolerate carrier NAT while still bounding automated abuse.
+  // NOTE: per-account limiting is a stronger follow-up.
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 120,
+    customRules: {
+      '/sign-in/email': { window: 60, max: 20 },
+      '/sign-up/email': { window: 60, max: 10 },
+      '/email-otp/send-verification-otp': { window: 60, max: 5 },
+      '/email-otp/verify-email': { window: 60, max: 15 },
+      '/forget-password': { window: 60, max: 10 },
+      '/reset-password': { window: 60, max: 10 },
+    },
+  },
 
   // ── ID generation — always UUID so our FK columns stay @db.Uuid ────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,29 +139,31 @@ export const auth = betterAuth({
   // ── Email + password ────────────────────────────────────────────────────
   emailAndPassword: {
     enabled: true,
-    // Set to true once email/OTP sending is wired up via Resend.
-    // Keep false in dev so you can sign in immediately after registration.
-    requireEmailVerification: false,
+    // Env-driven: enable verification in staging/prod once email is configured.
+    requireEmailVerification:
+      process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
     minPasswordLength: 8,
   },
 
-  // ── Google OAuth ────────────────────────────────────────────────────────
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-    },
-  },
+  // ── Social OAuth (Google + Apple) — see top of file; only configured providers ──
+  socialProviders,
 
   // ── Plugins ─────────────────────────────────────────────────────────────
   plugins: [
+    // Lets the mobile/web apps authenticate with `Authorization: Bearer <token>`
+    // (token stored in flutter_secure_storage) instead of cookies. The token is
+    // returned in the `set-auth-token` response header on sign-in/sign-up.
+    bearer(),
+    // TOTP-based two-factor auth (authenticator apps). Requires the TwoFactor
+    // table (see prisma/schema.prisma) + user.twoFactorEnabled. When a user with
+    // 2FA enabled signs in, Better Auth returns { twoFactorRedirect: true } and
+    // the client must complete /two-factor/verify-totp.
+    twoFactor({ issuer: 'Planovar' }),
     emailOTP({
       otpLength: 6,
       expiresIn: 600, // 10 minutes
       async sendVerificationOTP({ email, otp, type }) {
-        // Resend integration added in the notifications module.
-        // For now we log to console so local dev works without email config.
-        console.log(`[OTP] ${type} → ${email}: ${otp}`);
+        await deliverOtp(email, otp, type);
       },
     }),
   ],
@@ -69,9 +174,10 @@ export const auth = betterAuth({
       role: {
         type: 'string',
         defaultValue: 'CLIENT',
-        // input: true allows the client to pass it during sign-up.
-        // The Flutter apps always send the correct role for their surface.
-        input: true,
+        // SECURITY: never client-settable — otherwise anyone could self-register
+        // as ADMIN/VENDOR. New users are CLIENT; the role is elevated server-side
+        // (e.g. VendorsService.onboard sets VENDOR; admins are provisioned manually).
+        input: false,
       },
       phone: {
         type: 'string',
@@ -91,10 +197,44 @@ export const auth = betterAuth({
         required: false,
         input: true,
       },
+      // ISO date string (YYYY-MM-DD), supplied at vendor signup.
+      dateOfBirth: {
+        type: 'string',
+        required: false,
+        input: true,
+      },
       isActive: {
         type: 'boolean',
         defaultValue: true,
         input: false, // only set server-side
+      },
+    },
+  },
+
+  // ── Database hooks ─────────────────────────────────────────────────────────
+  // Normalize the phone to E.164 and reject duplicates with a friendly message
+  // (otherwise the `phone @unique` violation surfaces as an opaque 500/422).
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          const phone = normalizePhone(
+            (user as { phone?: string | null }).phone,
+          );
+          if (phone) {
+            const existing = await prisma.user.findUnique({
+              where: { phone },
+              select: { id: true },
+            });
+            if (existing) {
+              throw new APIError('UNPROCESSABLE_ENTITY', {
+                message:
+                  'This phone number is already registered. Please sign in or use a different number.',
+              });
+            }
+          }
+          return { data: { ...user, phone } };
+        },
       },
     },
   },
