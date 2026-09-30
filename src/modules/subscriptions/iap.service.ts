@@ -8,9 +8,55 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SubscriptionStatus, SubscriptionTier } from '@prisma/client';
+import {
+  APIException,
+  AppStoreServerAPIClient,
+  AutoRenewStatus,
+  Environment,
+  NotificationTypeV2,
+  OfferType,
+  ReceiptUtility,
+  SignedDataVerifier,
+  Status,
+  Subtype,
+  type ResponseBodyV2DecodedPayload,
+  type StatusResponse,
+} from '@apple/app-store-server-library';
+import { GoogleAuth } from 'google-auth-library';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IapVerifyDto } from './dto/iap-verify.dto';
 import { IapPlatform, resolveIapProduct } from './iap/iap-products';
+
+/**
+ * Apple root CA certificates (G3 + G2), DER-encoded then base64'd. These are the
+ * public roots published at https://www.apple.com/certificateauthority/ and are
+ * pinned here so `SignedDataVerifier` can validate the x5c chain on every App
+ * Store JWS (transactions, renewal info, and server notifications).
+ */
+const APPLE_ROOT_CA_G3_B64 =
+  'MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMTQwNDMwMTgxOTA2WhcNMzkwNDMwMTgxOTA2WjBnMRswGQYDVQQDDBJBcHBsZSBSb290IENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABJjpLz1AcqTtkyJygRMc3RCV8cWjTnHcFBbZDuWmBSp3ZHtfTjjTuxxEtX/1H7YyYl3J6YRbTzBPEVoA/VhYDKX1DyxNB0cTddqXl5dvMVztK517IDvYuVTZXpmkOlEKMaNCMEAwHQYDVR0OBBYEFLuw3qFYM4iapIqZ3r6966/ayySrMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMDA2gAMGUCMQCD6cHEFl4aXTQY2e3v9GwOAEZLuN+yRhHFD/3meoyhpmvOwgPUnPWTxnS4at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM6BgD56KyKA==';
+const APPLE_ROOT_CA_G2_B64 =
+  'MIIFkjCCA3qgAwIBAgIIAeDltYNno+AwDQYJKoZIhvcNAQEMBQAwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEcyMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMTQwNDMwMTgxMDA5WhcNMzkwNDMwMTgxMDA5WjBnMRswGQYDVQQDDBJBcHBsZSBSb290IENBIC0gRzIxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBANgREkhI2imKScUcx+xuM23+TfvgHN6sXuI2pyT5f1BrTM65MFQn5bPW7SXmMLYFN14UIhHF6Kob0vuy0gmVOKTvKkmMXT5xZgM4+xb1hYjkWpIMBDLyyED7Ul+f9sDx47pFoFDVEovy3d6RhiPw9bZyLgHaC/YuOQhfGaFjQQscp5TBhsRTL3b2CtcM0YM/GlMZ81fVJ3/8E7j4ko380yhDPLVoACVdJ2LT3VXdRCCQgzWTxb+4Gftr49wIQuavbfqeQMpOhYV4SbHXw8EwOTKrfl+q04tvny0aIWhwZ7Oj8ZhBbZF8+NfbqOdfIRqMM78xdLe40fTgIvS/cjTf94FNcX1RoeKz8NMoFnNvzcytN31O661A4T+B/fc9Cj6i8b0xlilZ3MIZgIxbdMYs0xBTJh0UT8TUgWY8h2czJxQI6bR3hDRSj4n4aJgXv8O7qhOTH11UL6jHfPsNFL4VPSQ08prcdUFmIrQB1guvkJ4M6mL4m1k8COKWNORj3rw31OsMiANDC1CvoDTdUE0V+1ok2Az6DGOeHwOx4e7hqkP0ZmUoNwIx7wHHHtHMn23KVDpA287PT0aLSmWaasZobNfMmRtHsHLDd4/E92GcdB/O/WuhwpyUgquUoue9G7q5cDmVF8Up8zlYNPXEpMZ7YLlmQ1A/bmH8DvmGqmAMQ0uVAgMBAAGjQjBAMB0GA1UdDgQWBBTEmRNsGAPCe8CjoA1/coB6HHcmjTAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjANBgkqhkiG9w0BAQwFAAOCAgEAUabz4vS4PZO/Lc4Pu1vhVRROTtHlznldgX/+tvCHM/jvlOV+3Gp5pxy+8JS3ptEwnMgNCnWefZKVfhidfsJxaXwU6s+DDuQUQp50DhDNqxq6EWGBeNjxtUVAeKuowM77fWM3aPbn+6/Gw0vsHzYmE1SGlHKy6gLti23kDKaQwFd1z4xCfVzmMX3zybKSaUYOiPjjLUKyOKimGY3xn83uamW8GrAlvacp/fQ+onVJv57byfenHmOZ4VxG/5IFjPoeIPmGlFYl5bRXOJ3riGQUIUkhOb9iZqmxospvPyFgxYnURTbImHy99v6ZSYA7LNKmp4gDBDEZt7Y6YUX6yfIjyGNzv1aJMbDZfGKnexWoiIqrOEDCzBL/FePwN983csvMmOa/orz6JopxVtfnJBtIRD6e/J/JzBrsQzwBvDR4yGn1xuZW7AYJNpDrFEobXsmII9oDMJELuDY++ee1KG++P+w8j2Ud5cAeh6Squpj9kuNsJnfdBrRkBof0Tta6SqoWqPQFZ2aWuuJVecMsXUmPgEkrihLHdoBR37q9ZV0+N0djMenl9MU/S60EinpxLK8JQzcPqOMyT/RFtm2XNuyE9QoB6he7hY1Ck3DDUOUUi78/w0EP3SIEIwiKum1xRKtzCTrJ+VKACd+66eYWyi4uTLLT3OUEVLLUNIAytbwPF+E=';
+const APPLE_ROOT_CAS: Buffer[] = [APPLE_ROOT_CA_G3_B64, APPLE_ROOT_CA_G2_B64].map(
+  (b64) => Buffer.from(b64, 'base64'),
+);
+
+/** Minimal shape of the fields we read from Google Play `subscriptionsv2.get`. */
+interface GoogleOfferDetails {
+  basePlanId?: string;
+  offerId?: string;
+  offerTags?: string[];
+}
+interface GoogleLineItem {
+  productId?: string;
+  expiryTime?: string;
+  offerDetails?: GoogleOfferDetails;
+}
+interface GooglePurchaseV2 {
+  subscriptionState?: string;
+  lineItems?: GoogleLineItem[];
+  latestOrderId?: string;
+}
 
 /**
  * Normalized shape every store validator returns, regardless of platform.
@@ -39,11 +85,10 @@ type IapNotificationAction = 'renew' | 'expire' | 'cancel' | 'refund' | 'ignore'
  *   client buys in the native store → sends us the receipt/token →
  *   we validate it against the store → activate the VendorSubscription.
  *
- * SCAFFOLD STATUS: the architecture, product mapping, persistence and webhook
- * routing are complete and wired. The two real store calls (App Store Server
- * API / Google Play Developer API) and the notification signature verification
- * are guarded on env config and marked with `TODO(iap)`; until credentials are
- * set they fail safe with a clear "not configured" error.
+ * The store calls (App Store Server API / Google Play Developer API) and the
+ * server-notification signature verification are implemented and guarded on env
+ * config; until credentials are set they fail safe with a clear "not configured"
+ * error.
  */
 @Injectable()
 export class IapService {
@@ -162,7 +207,7 @@ export class IapService {
    */
   private async validateApple(
     productId: string,
-    _purchaseToken: string,
+    purchaseToken: string,
   ): Promise<NormalizedIapPurchase> {
     const issuerId = this.config.get<string>('APPLE_IAP_ISSUER_ID');
     const keyId = this.config.get<string>('APPLE_IAP_KEY_ID');
@@ -173,21 +218,210 @@ export class IapService {
         'In-app purchases are not configured yet',
       );
     }
+    const appAppleId = this.appleAppAppleId();
 
-    // TODO(iap): call App Store Server API.
-    //   1. Build a ES256-signed JWT (issuerId, keyId, privateKey, bid=bundleId,
-    //      aud="appstoreconnect-v1") for the App Store Server API.
-    //   2. GET /inApps/v1/subscriptions/{transactionId} (or verify the signed
-    //      transaction JWS the client sent), verifying Apple's x5c cert chain
-    //      to the Apple Root CA.
-    //   3. Read the latest transaction + renewal info: expiresDate,
-    //      originalTransactionId, productId, and offerType (introductory ⇒ trial).
-    // Recommended lib: `@apple/app-store-server-library` (Apple's official SDK).
-    throw new ServiceUnavailableException(
-      'Apple in-app purchase verification is not implemented yet',
+    // The iOS client sends verificationData.serverVerificationData. With the
+    // in_app_purchase plugin's default StoreKit1 config that is the base64 app
+    // receipt; some setups send a StoreKit2 signed-transaction JWS or a bare
+    // transaction id. Resolve all shapes to a transactionId we can query with.
+    const transactionId = await this.resolveAppleTransactionId(
+      purchaseToken,
+      bundleId,
+      appAppleId,
     );
-    // Unreachable until implemented; documents the normalized contract:
-    // return { productId, originalTxnId, expiresAt, isTrial, isActive };
+    if (!transactionId) {
+      throw new BadRequestException(
+        'Could not extract a transaction id from the Apple purchase token',
+      );
+    }
+
+    // An App Store transaction lives in exactly one environment. Query
+    // Production first; a "not found" there means it is a Sandbox purchase, so
+    // retry Sandbox before giving up.
+    for (const environment of [Environment.PRODUCTION, Environment.SANDBOX]) {
+      let statuses: StatusResponse;
+      try {
+        const client = new AppStoreServerAPIClient(
+          privateKey,
+          keyId,
+          issuerId,
+          bundleId,
+          environment,
+        );
+        statuses = await client.getAllSubscriptionStatuses(transactionId);
+      } catch (err) {
+        if (
+          environment === Environment.PRODUCTION &&
+          this.isAppleWrongEnvironment(err)
+        ) {
+          continue; // fall through to Sandbox
+        }
+        throw new BadRequestException(
+          `Apple could not verify this purchase: ${this.errText(err)}`,
+        );
+      }
+
+      // Verify the x5c chain to Apple's root and decode the signed data.
+      const verifier = new SignedDataVerifier(
+        APPLE_ROOT_CAS,
+        true, // enableOnlineChecks: OCSP revocation check on the cert chain
+        environment,
+        bundleId,
+        appAppleId,
+      );
+
+      const match = await this.findAppleProduct(statuses, productId, verifier);
+      if (!match) {
+        throw new BadRequestException(
+          `No Apple subscription found for product ${productId}`,
+        );
+      }
+      return match;
+    }
+
+    throw new BadRequestException(
+      'Apple did not recognise this transaction in Production or Sandbox',
+    );
+  }
+
+  /**
+   * Resolve the iOS `serverVerificationData` (base64 app receipt by default, or
+   * a StoreKit2 signed-transaction JWS, or a bare transaction id) to a single
+   * transaction id usable with the App Store Server API. Degrades gracefully
+   * through each shape.
+   */
+  private async resolveAppleTransactionId(
+    token: string,
+    bundleId: string,
+    appAppleId?: number,
+  ): Promise<string | null> {
+    const receiptUtil = new ReceiptUtility();
+
+    // 1. StoreKit1 base64 app receipt (the plugin default).
+    try {
+      const id = receiptUtil.extractTransactionIdFromAppReceipt(token);
+      if (id) return id;
+    } catch {
+      /* not a base64 app receipt — try the next shape */
+    }
+
+    // 2. Legacy base64 transaction receipt.
+    try {
+      const id = receiptUtil.extractTransactionIdFromTransactionReceipt(token);
+      if (id) return id;
+    } catch {
+      /* not a transaction receipt — try the next shape */
+    }
+
+    // 3. StoreKit2 signed-transaction JWS (three dot-separated segments): verify
+    //    and decode it to read the transaction id.
+    if (token.split('.').length === 3) {
+      for (const environment of [Environment.PRODUCTION, Environment.SANDBOX]) {
+        try {
+          const verifier = new SignedDataVerifier(
+            APPLE_ROOT_CAS,
+            true,
+            environment,
+            bundleId,
+            appAppleId,
+          );
+          const txn = await verifier.verifyAndDecodeTransaction(token);
+          if (txn.transactionId) return txn.transactionId;
+        } catch {
+          /* wrong environment or not a transaction JWS — keep trying */
+        }
+      }
+    }
+
+    // 4. Assume the client already sent a bare transaction id.
+    return token || null;
+  }
+
+  /**
+   * Locate, verify, and normalize the subscription for `productId` within an
+   * App Store Server API status response.
+   */
+  private async findAppleProduct(
+    statuses: StatusResponse,
+    productId: string,
+    verifier: SignedDataVerifier,
+  ): Promise<NormalizedIapPurchase | null> {
+    for (const group of statuses.data ?? []) {
+      for (const item of group.lastTransactions ?? []) {
+        if (!item.signedTransactionInfo) continue;
+
+        let txn;
+        try {
+          txn = await verifier.verifyAndDecodeTransaction(
+            item.signedTransactionInfo,
+          );
+        } catch {
+          continue; // signature failed — skip this transaction
+        }
+        if (txn.productId !== productId) continue;
+
+        // Trial = the store's introductory offer, read from the transaction and
+        // (as a fallback) the renewal info.
+        let isTrial = txn.offerType === OfferType.INTRODUCTORY_OFFER;
+        if (!isTrial && item.signedRenewalInfo) {
+          try {
+            const renewal = await verifier.verifyAndDecodeRenewalInfo(
+              item.signedRenewalInfo,
+            );
+            isTrial = renewal.offerType === OfferType.INTRODUCTORY_OFFER;
+          } catch {
+            /* renewal decode is best-effort for trial detection */
+          }
+        }
+
+        const expiresAt = txn.expiresDate
+          ? new Date(txn.expiresDate)
+          : new Date(0);
+        const statusActive =
+          item.status === Status.ACTIVE ||
+          item.status === Status.BILLING_GRACE_PERIOD;
+        const isActive =
+          statusActive &&
+          !txn.revocationDate &&
+          expiresAt.getTime() > Date.now();
+
+        return {
+          productId: txn.productId ?? productId,
+          originalTxnId:
+            txn.originalTransactionId ?? item.originalTransactionId ?? '',
+          expiresAt,
+          isTrial,
+          isActive,
+        };
+      }
+    }
+    return null;
+  }
+
+  /** True when an App Store Server API error means "not in this environment". */
+  private isAppleWrongEnvironment(err: unknown): boolean {
+    if (err instanceof APIException) {
+      if (err.httpStatusCode === 404) return true;
+      const notFound = [
+        4040010, // TRANSACTION_ID_NOT_FOUND
+        4040005, // ORIGINAL_TRANSACTION_ID_NOT_FOUND
+        4040006, // ORIGINAL_TRANSACTION_ID_NOT_FOUND_RETRYABLE
+      ];
+      return typeof err.apiError === 'number' && notFound.includes(err.apiError);
+    }
+    return false;
+  }
+
+  /** Optional numeric App Store app id, required for Production JWS verification. */
+  private appleAppAppleId(): number | undefined {
+    const raw = this.config.get<string>('APPLE_IAP_APP_APPLE_ID');
+    if (!raw) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  private errText(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
   }
 
   /**
@@ -196,7 +430,7 @@ export class IapService {
    */
   private async validateGoogle(
     productId: string,
-    _purchaseToken: string,
+    purchaseToken: string,
   ): Promise<NormalizedIapPurchase> {
     const packageName = this.config.get<string>('GOOGLE_PLAY_PACKAGE_NAME');
     const serviceAccountJson = this.config.get<string>(
@@ -208,21 +442,85 @@ export class IapService {
       );
     }
 
-    // TODO(iap): call the Google Play Developer API.
-    //   1. Authenticate with the service-account JSON (scope
-    //      https://www.googleapis.com/auth/androidpublisher).
-    //   2. GET purchases.subscriptionsv2.get({ packageName, token: purchaseToken })
-    //      (or the legacy purchases.subscriptions.get).
-    //   3. Read lineItems[].expiryTime, subscriptionState
-    //      (SUBSCRIPTION_STATE_ACTIVE / _IN_GRACE_PERIOD ⇒ active), and
-    //      paymentState / offer details (free-trial ⇒ trial). The purchase token
-    //      is the stable key stored as iapOriginalTxnId.
-    // Recommended lib: `googleapis` (androidpublisher_v3).
-    throw new ServiceUnavailableException(
-      'Google Play in-app purchase verification is not implemented yet',
+    let credentials: Record<string, unknown>;
+    try {
+      credentials = JSON.parse(serviceAccountJson);
+    } catch {
+      throw new ServiceUnavailableException(
+        'Google Play service account JSON is not valid',
+      );
+    }
+
+    const auth = new GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+    });
+
+    // androidpublisher v3 purchases.subscriptionsv2.get — the purchase token is
+    // the stable key we persist as iapOriginalTxnId.
+    const url =
+      'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' +
+      `${encodeURIComponent(packageName)}/purchases/subscriptionsv2/tokens/` +
+      encodeURIComponent(purchaseToken);
+
+    let data: GooglePurchaseV2;
+    try {
+      const res = await auth.request<GooglePurchaseV2>({ url });
+      data = res.data;
+    } catch (err) {
+      throw new BadRequestException(
+        `Google could not verify this purchase: ${this.errText(err)}`,
+      );
+    }
+
+    const state = data.subscriptionState;
+    const isActive =
+      state === 'SUBSCRIPTION_STATE_ACTIVE' ||
+      state === 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD';
+
+    const lineItems = data.lineItems ?? [];
+    // Prefer the line item for the product we were asked about; otherwise the
+    // one that expires latest (the currently-governing entitlement).
+    const chosen =
+      lineItems.find((li) => li.productId === productId) ??
+      lineItems
+        .slice()
+        .sort((a, b) => this.gTime(b.expiryTime) - this.gTime(a.expiryTime))[0];
+
+    const latestExpiryMs = lineItems.reduce(
+      (max, li) => Math.max(max, this.gTime(li.expiryTime)),
+      0,
     );
-    // Unreachable until implemented; documents the normalized contract:
-    // return { productId, originalTxnId, expiresAt, isTrial, isActive };
+    const expiresAt = latestExpiryMs > 0 ? new Date(latestExpiryMs) : new Date(0);
+
+    // The client already acknowledges the purchase via completePurchase; a
+    // server-side purchases.subscriptions.acknowledge is optional and omitted.
+    return {
+      productId: chosen?.productId ?? productId,
+      originalTxnId: purchaseToken,
+      expiresAt,
+      isTrial: this.googleLineItemIsTrial(chosen),
+      isActive,
+    };
+  }
+
+  private gTime(iso?: string): number {
+    if (!iso) return 0;
+    const t = Date.parse(iso);
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  /**
+   * Best-effort free-trial detection for Google Play. `subscriptionsv2.get` does
+   * not surface the active offer *phase*, so a trial is only recognised when the
+   * developer has tagged the offer accordingly; otherwise false (per contract).
+   */
+  private googleLineItemIsTrial(li?: GoogleLineItem): boolean {
+    const tags = li?.offerDetails?.offerTags;
+    if (Array.isArray(tags)) {
+      return tags.some((t) => /free[_-]?trial|trial/i.test(t ?? ''));
+    }
+    return false;
   }
 
   // ─── Store server notifications (scaffold) ─────────────────────────────────
@@ -241,25 +539,95 @@ export class IapService {
       return;
     }
 
-    // TODO(iap): verify + decode the JWS.
-    //   - Verify the x5c header cert chain against the Apple Root CA, then read
-    //     the payload. Recommended: `@apple/app-store-server-library`
-    //     (SignedDataVerifier).
-    //   - notificationType/subtype live in the decoded payload; the transaction
-    //     info (originalTransactionId, expiresDate) is a nested signed JWS.
-    // Until keys are wired we cannot trust the payload, so bail out safely.
-    const decoded = this.decodeAppleUnverified(body.signedPayload);
-    if (!decoded) {
-      this.logger.warn('Apple notification could not be decoded — ignoring');
+    const bundleId = this.config.get<string>('APPLE_IAP_BUNDLE_ID');
+    if (!bundleId) {
+      this.logger.warn(
+        'Apple notifications not configured (no bundle id) — ignoring',
+      );
+      return;
+    }
+    const appAppleId = this.appleAppAppleId();
+
+    // Verify the x5c chain against Apple's root and decode the ASSN v2 JWS. The
+    // signing environment is embedded in the payload, so try Production then
+    // Sandbox verifiers and keep the one that succeeds.
+    let payload: ResponseBodyV2DecodedPayload | null = null;
+    let verifier: SignedDataVerifier | null = null;
+    for (const environment of [Environment.PRODUCTION, Environment.SANDBOX]) {
+      try {
+        const v = new SignedDataVerifier(
+          APPLE_ROOT_CAS,
+          true,
+          environment,
+          bundleId,
+          appAppleId,
+        );
+        payload = await v.verifyAndDecodeNotification(body.signedPayload);
+        verifier = v;
+        break;
+      } catch (err) {
+        this.logger.debug(
+          `Apple notification ${environment} verify failed: ${this.errText(err)}`,
+        );
+      }
+    }
+    if (!payload || !verifier) {
+      this.logger.warn(
+        'Apple notification failed signature verification — ignoring',
+      );
       return;
     }
 
-    const action = this.classifyAppleType(decoded.notificationType);
+    // The transaction/renewal info is nested signed JWS — decode it (with the
+    // same verified environment) for the originalTransactionId, expiry, and
+    // auto-renew status.
+    let originalTransactionId: string | undefined;
+    let expiresAt: Date | undefined;
+    let autoRenewOff = false;
+    if (payload.data?.signedTransactionInfo) {
+      try {
+        const txn = await verifier.verifyAndDecodeTransaction(
+          payload.data.signedTransactionInfo,
+        );
+        originalTransactionId = txn.originalTransactionId;
+        if (txn.expiresDate) expiresAt = new Date(txn.expiresDate);
+      } catch (err) {
+        this.logger.warn(
+          `Apple notification transaction decode failed: ${this.errText(err)}`,
+        );
+      }
+    }
+    if (payload.data?.signedRenewalInfo) {
+      try {
+        const renewal = await verifier.verifyAndDecodeRenewalInfo(
+          payload.data.signedRenewalInfo,
+        );
+        if (renewal.autoRenewStatus === AutoRenewStatus.OFF) autoRenewOff = true;
+        if (!originalTransactionId) {
+          originalTransactionId = renewal.originalTransactionId;
+        }
+      } catch {
+        /* renewal decode is best-effort */
+      }
+    }
+
+    // DID_RENEW → renew, EXPIRED → expire, REFUND/REVOKE → refund,
+    // DID_CHANGE_RENEWAL_STATUS with auto-renew OFF → cancel-at-period-end.
+    // Everything else is ignored (never throw on unknown types).
+    let action: IapNotificationAction;
+    if (payload.notificationType === NotificationTypeV2.DID_CHANGE_RENEWAL_STATUS) {
+      const disabled =
+        payload.subtype === Subtype.AUTO_RENEW_DISABLED || autoRenewOff;
+      action = disabled ? 'cancel' : 'ignore';
+    } else {
+      action = this.classifyAppleType(payload.notificationType);
+    }
+
     await this.applyNotification(
       'apple',
-      decoded.originalTransactionId,
+      originalTransactionId,
       action,
-      decoded.expiresAt,
+      expiresAt,
     );
   }
 
@@ -270,7 +638,9 @@ export class IapService {
    * purchaseToken (our iapOriginalTxnId). Never throws on unknown types.
    */
   async handleGoogleNotification(body: {
-    message?: { data?: string };
+    message?: { data?: string; attributes?: Record<string, string> };
+    subscription?: string;
+    token?: string;
   }): Promise<void> {
     const dataB64 = body?.message?.data;
     if (!dataB64) {
@@ -278,15 +648,32 @@ export class IapService {
       return;
     }
 
-    // TODO(iap): the Pub/Sub push itself should be authenticated (verify the
-    //   OIDC token in the Authorization header against Google's certs, and/or a
-    //   shared-secret path segment). The base64 payload below is decoded but its
-    //   authenticity is only established by that check plus re-fetching the
-    //   purchase via validateGoogle().
+    // Optional shared-secret check: if a verification token is configured, the
+    // Pub/Sub push must present a matching one (forwarded as a body token or a
+    // message attribute). A mismatch is rejected; if configured but not
+    // presented we log and still proceed — authenticity is re-established below
+    // by re-fetching the purchase from Google.
+    const expectedToken = this.config.get<string>(
+      'GOOGLE_RTDN_VERIFICATION_TOKEN',
+    );
+    if (expectedToken) {
+      const presented = body.token ?? body.message?.attributes?.token;
+      if (presented && presented !== expectedToken) {
+        this.logger.warn('Google RTDN verification token mismatch — ignoring');
+        return;
+      }
+      if (!presented) {
+        this.logger.warn(
+          'Google RTDN verification token configured but not presented — proceeding on re-fetch',
+        );
+      }
+    }
+
     let decoded: {
       subscriptionNotification?: {
         notificationType?: number;
         purchaseToken?: string;
+        subscriptionId?: string;
       };
     };
     try {
@@ -304,9 +691,28 @@ export class IapService {
     }
 
     const action = this.classifyGoogleType(notif.notificationType);
-    // TODO(iap): for renew, re-fetch the authoritative expiry via
-    // validateGoogle(purchaseToken) rather than trusting the notification.
-    await this.applyNotification('google', notif.purchaseToken, action);
+
+    // The RTDN carries no expiry; for a renewal, re-fetch the authoritative
+    // expiry from the Play Developer API rather than trusting the notification.
+    let expiresAt: Date | undefined;
+    if (action === 'renew') {
+      try {
+        const purchase = await this.validateGoogle(
+          notif.subscriptionId ?? '',
+          notif.purchaseToken,
+        );
+        expiresAt = purchase.expiresAt;
+      } catch (err) {
+        this.logger.warn(`Google RTDN re-fetch failed: ${this.errText(err)}`);
+      }
+    }
+
+    await this.applyNotification(
+      'google',
+      notif.purchaseToken,
+      action,
+      expiresAt,
+    );
   }
 
   /** Apply a normalized notification action to the matching subscription. */
@@ -406,36 +812,6 @@ export class IapService {
         return 'refund';
       default:
         return 'ignore';
-    }
-  }
-
-  /**
-   * Best-effort, UNVERIFIED decode of an Apple signedPayload's JWS body, used
-   * only to route the notification during the scaffold phase. The real handler
-   * must replace this with a cert-chain-verified decode (see the TODO above).
-   */
-  private decodeAppleUnverified(signedPayload: string): {
-    notificationType?: string;
-    originalTransactionId?: string;
-    expiresAt?: Date;
-  } | null {
-    try {
-      const [, payloadB64] = signedPayload.split('.');
-      if (!payloadB64) return null;
-      const payload = JSON.parse(
-        Buffer.from(payloadB64, 'base64url').toString('utf8'),
-      );
-      // The transaction info is itself a nested signed JWS; a real impl decodes
-      // it too. We surface only what routing needs and leave the rest to TODO.
-      return {
-        notificationType: payload?.notificationType,
-        originalTransactionId:
-          payload?.data?.originalTransactionId ??
-          payload?.summary?.originalTransactionId,
-        expiresAt: undefined,
-      };
-    } catch {
-      return null;
     }
   }
 
