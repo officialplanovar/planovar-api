@@ -9,7 +9,7 @@ const handler = toNodeHandler(auth);
 // This covers: sign-up, sign-in, sign-out, OTP, Google OAuth, session, etc.
 @Controller('api/auth')
 export class AuthController {
-  @All('*')
+  @All('*path')
   async handle(@Req() req: Request, @Res() res: Response) {
     return handler(req, res);
   }
