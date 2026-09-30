@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -66,11 +67,13 @@ export class IapController {
   })
   async googleWebhook(
     @Req() req: RawBodyRequest<Request>,
-    @Body() body: { message?: { data?: string } },
+    @Body() body: { message?: { data?: string }; token?: string },
+    @Query('token') token?: string,
   ) {
     // Pub/Sub push: `{ message: { data: <base64 JSON> }, subscription }`.
-    // req.rawBody is available for OIDC-token verification once wired.
-    await this.iap.handleGoogleNotification(body ?? {});
+    // A shared secret can be carried in the push URL query (`?token=…`) and
+    // checked against GOOGLE_RTDN_VERIFICATION_TOKEN; forward it into the body.
+    await this.iap.handleGoogleNotification({ ...(body ?? {}), token: token ?? body?.token });
     return { received: true };
   }
 }
