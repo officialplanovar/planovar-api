@@ -348,9 +348,8 @@ const SUBSCRIPTION_PLANS = [
     listingLimit: 0, // signup + business description only; no listings
     features: [
       'Business profile & description',
-      'Discoverable on the platform',
+      'Discoverable in search',
       'Chat with clients',
-      'No product/service listings',
     ],
   },
   {
@@ -361,8 +360,8 @@ const SUBSCRIPTION_PLANS = [
     currency: 'USD',
     listingLimit: 5,
     features: [
-      'Up to 5 listings (products/services/rentals)',
       'Customisable storefront',
+      'Up to 5 listings',
       'Priority search ranking',
       'Analytics dashboard',
     ],
@@ -377,7 +376,7 @@ const SUBSCRIPTION_PLANS = [
     features: [
       'Everything in Premium',
       'Unlimited listings',
-      'Highest search ranking + ads',
+      'Top search ranking + ads',
       'In-app voice calling',
       'Dedicated success manager',
     ],
