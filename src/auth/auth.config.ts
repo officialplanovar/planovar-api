@@ -53,7 +53,8 @@ async function deliverOtp(email: string, otp: string, type: string) {
   const purpose =
     type === 'sign-in' ? 'login' : type === 'forget-password' ? 'reset' : 'verify';
   const { subject, html } = emailTemplates.otp(otp, purpose);
-  await resend.emails.send({ from: EMAIL_FROM, to: email, subject, html });
+  const { error } = await resend.emails.send({ from: EMAIL_FROM, to: email, subject, html });
+  if (error) console.error(`[OTP] Resend rejected ${type} → ${email}:`, error);
 }
 
 // ── Social providers — only enabled when their credentials are configured ──
