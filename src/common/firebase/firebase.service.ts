@@ -36,21 +36,49 @@ export class FirebaseService implements OnModuleInit {
       return;
     }
 
-    // Avoid re-initialising if the default app already exists (hot-reload safety)
-    if (!admin.apps.length) {
-      this.app = admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          // .env stores \n as literal \\n — convert back
-          privateKey: privateKey.replace(/\\n/g, '\n'),
-        }),
-      });
-    } else {
-      this.app = admin.app();
+    // Initialisation must never crash the whole API: a malformed credential
+    // disables push and logs loudly, but the server still boots.
+    try {
+      // Avoid re-initialising if the default app already exists (hot-reload safety)
+      if (!admin.apps.length) {
+        this.app = admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey: this.normalizePrivateKey(privateKey),
+          }),
+        });
+      } else {
+        this.app = admin.app();
+      }
+      this.logger.log('Firebase Admin initialised');
+    } catch (err) {
+      this.app = null;
+      this.logger.error(
+        'Firebase Admin failed to initialise — push notifications disabled. ' +
+          'Check FIREBASE_PRIVATE_KEY is the full PEM (BEGIN/END lines + newlines). ' +
+          `Cause: ${(err as Error).message}`,
+      );
     }
+  }
 
-    this.logger.log('Firebase Admin initialised');
+  /**
+   * Env stores the PEM on a single line with `\n` escapes (and env UIs often
+   * wrap it in quotes). Restore real newlines and strip common paste artefacts
+   * so OpenSSL can decode it.
+   */
+  private normalizePrivateKey(raw: string): string {
+    let key = raw.trim();
+    // Strip a single pair of wrapping quotes if the whole value is quoted.
+    if (
+      (key.startsWith('"') && key.endsWith('"')) ||
+      (key.startsWith("'") && key.endsWith("'"))
+    ) {
+      key = key.slice(1, -1);
+    }
+    // Convert literal "\n" (and "\r\n") escapes into real line breaks.
+    key = key.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
+    return key;
   }
 
   // ─── Public API ──────────────────────────────────────────────────────────
