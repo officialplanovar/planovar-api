@@ -13,6 +13,7 @@ import { EmailModule } from './common/email/email.module';
 import { FirebaseModule } from './common/firebase/firebase.module';
 import { TypesenseModule } from './common/typesense/typesense.module';
 import { AuditModule } from './common/audit/audit.module';
+import { LegalModule } from './common/legal/legal.module';
 
 // Auth
 import { AuthModule } from './auth/auth.module';
@@ -68,6 +69,7 @@ import { SearchModule } from './modules/search/search.module';
     UploadModule,
     TypesenseModule,
     AuditModule,
+    LegalModule,
 
     // ─── Auth ─────────────────────────────────────────────────────────────
     AuthModule,
