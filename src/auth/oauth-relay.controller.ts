@@ -5,10 +5,13 @@ import type { Request, Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { auth } from './auth.config';
 
+/** Social providers the relay can start. Mirrors auth.config's socialProviders. */
+const SUPPORTED_PROVIDERS = new Set(['google', 'apple']);
+
 /**
  * OAuth token relay.
  *
- * Social sign-in (Google) establishes a session as a cookie on THIS origin.
+ * Social sign-in (Google / Apple) establishes a session as a cookie on THIS origin.
  * Mobile/SPA clients authenticate by bearer token, not cookies, and are often
  * cross-origin — so they can't read that cookie. Better Auth is told to use
  * `/oauth/relay?redirect=<appTarget>` as its post-callback `callbackURL`; this
@@ -83,13 +86,16 @@ export class OAuthRelayController {
    * cross-origin SPA via XHR fails with `state_mismatch` because the browser
    * won't store Better Auth's SameSite=Lax state cookie from the XHR response.
    * Navigating the browser here (first-party to the API) sets that cookie
-   * correctly, then redirects to Google. `intent` (client|vendor) records which
-   * app the user signed up through, so the relay can type a brand-new account.
+   * correctly, then redirects to the provider. `provider` (google|apple,
+   * default google) selects the identity provider; `intent` (client|vendor)
+   * records which app the user signed up through, so the relay can type a
+   * brand-new account.
    */
   @Get('start')
   async start(
     @Query('redirect') redirect: string,
     @Query('intent') intent: string,
+    @Query('provider') provider: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
@@ -97,12 +103,13 @@ export class OAuthRelayController {
       res.status(400).send('Invalid or missing redirect target');
       return;
     }
+    const chosen = SUPPORTED_PROVIDERS.has(provider) ? provider : 'google';
     const base = process.env.API_BASE_URL ?? 'http://localhost:3000';
     const intentParam =
       intent === 'vendor' || intent === 'client' ? `&intent=${intent}` : '';
     const callbackURL = `${base}/oauth/relay?redirect=${encodeURIComponent(redirect)}${intentParam}`;
     const response = await auth.api.signInSocial({
-      body: { provider: 'google', callbackURL },
+      body: { provider: chosen as 'google' | 'apple', callbackURL },
       headers: fromNodeHeaders(req.headers),
       asResponse: true,
     });
@@ -118,7 +125,7 @@ export class OAuthRelayController {
       url?: string;
     } | null;
     if (!data?.url) {
-      res.status(502).send('Could not start Google sign-in');
+      res.status(502).send(`Could not start ${chosen} sign-in`);
       return;
     }
     res.redirect(data.url);

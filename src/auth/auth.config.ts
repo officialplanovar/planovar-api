@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Resend } from 'resend';
 import { emailTemplates } from '../common/email/templates';
+import { resolveAppleClientSecret } from './apple-client-secret';
 
 // Prisma 7 uses a driver adapter instead of embedding the URL in the schema.
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -53,7 +54,8 @@ async function deliverOtp(email: string, otp: string, type: string) {
   const purpose =
     type === 'sign-in' ? 'login' : type === 'forget-password' ? 'reset' : 'verify';
   const { subject, html } = emailTemplates.otp(otp, purpose);
-  await resend.emails.send({ from: EMAIL_FROM, to: email, subject, html });
+  const { error } = await resend.emails.send({ from: EMAIL_FROM, to: email, subject, html });
+  if (error) console.error(`[OTP] Resend rejected ${type} → ${email}:`, error);
 }
 
 // ── Social providers — only enabled when their credentials are configured ──
@@ -64,11 +66,16 @@ if (process.env.GOOGLE_CLIENT_ID) {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
   };
 }
-if (process.env.APPLE_SERVICE_ID && process.env.APPLE_CLIENT_SECRET) {
+// Apple's client secret is a signed, expiring JWT — supplied directly or minted
+// at boot from the signing key (see resolveAppleClientSecret). The web-relay
+// flow (OAuthRelayController) validates against the Service ID, so no app bundle
+// id is required; `appBundleIdentifier` is only needed for NATIVE iOS token
+// validation, which this platform does not use.
+const appleClientSecret = resolveAppleClientSecret();
+if (process.env.APPLE_SERVICE_ID && appleClientSecret) {
   socialProviders.apple = {
     clientId: process.env.APPLE_SERVICE_ID,
-    clientSecret: process.env.APPLE_CLIENT_SECRET,
-    // For native iOS sign-in, Better Auth validates against the app bundle id.
+    clientSecret: appleClientSecret,
     ...(process.env.APPLE_APP_BUNDLE_ID && {
       appBundleIdentifier: process.env.APPLE_APP_BUNDLE_ID,
     }),
